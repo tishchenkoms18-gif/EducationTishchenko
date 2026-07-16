@@ -78,11 +78,8 @@ json
         "title": "Конференция .NET",
         "description": "Ежегодная конференция для разработчиков .NET",
         "startAt": "2026-08-15T10:00:00Z",
-        "endAt": "2026-08-15T18:00:00Z",
-        "status": "Active",
-        "isActive": true,
-        "createdAt": "2026-07-16T12:00:00Z",
-        "updatedAt": null
+        "endAt": "2026-08-15T18:00:00Z"
+       
     }
 ]
 
@@ -99,11 +96,7 @@ json
     "title": "Конференция .NET",
     "description": "Ежегодная конференция для разработчиков .NET",
     "startAt": "2026-08-15T10:00:00Z",
-    "endAt": "2026-08-15T18:00:00Z",
-    "status": "Active",
-    "isActive": true,
-    "createdAt": "2026-07-16T12:00:00Z",
-    "updatedAt": null
+    "endAt": "2026-08-15T18:00:00Z"
 }
 Ответ (404 Not Found):
 
@@ -133,11 +126,7 @@ json
     "title": "Конференция .NET 2026",
     "description": "Обновлённое описание конференции",
     "startAt": "2026-08-15T10:00:00Z",
-    "endAt": "2026-08-15T18:00:00Z",
-    "status": "Active",
-    "isActive": true,
-    "createdAt": "2026-07-16T12:00:00Z",
-    "updatedAt": "2026-07-16T13:00:00Z"
+    "endAt": "2026-08-15T18:00:00Z"
 }
 
 # 5. Удаление события (DELETE)
