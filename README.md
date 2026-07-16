@@ -26,7 +26,7 @@ REST API для управления мероприятиями. Проект р
 
 ```bash
 git clone https://github.com/tishchenkoms18-gif/EducationTishchenko.git
-cd WebAPI
+cd WebAPI/WebAPI
 
 Восстановите зависимости
 bash
@@ -67,7 +67,6 @@ json
 # 2. Получение всех событий (GET)
 Запрос:
 
-http
 GET https://localhost:5001/api/events
 Ответ (200 OK):
 
