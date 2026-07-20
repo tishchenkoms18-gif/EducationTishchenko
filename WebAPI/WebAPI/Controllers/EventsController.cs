@@ -11,17 +11,28 @@ public class EventsController : ControllerBase
     {
         _eventService = eventService;
     }
-
+/// <summary>
+/// Получить список всех событий с фильтрацией
+/// </summary>
+/// <param name="title">Поиск по названию (частичное совпадение, регистронезависимый)</param>
+/// <param name="from">События, начинающиеся не раньше указанной даты</param>
+/// <param name="to">События, заканчивающиеся не позже указанной даты</param>
+/// <returns></returns>
     // GET: api/events
     [HttpGet]
-    public IActionResult GetAll()
+    public IActionResult GetAll([FromQuery] string? title, [FromQuery] DateTime? from,[FromQuery] DateTime? to)
     {
-        var events =  _eventService.GetAllEvent();
+        var events =  _eventService.GetAllEvent().ToList();
         return Ok(events.Select(MapToResponse));
     }
+    /// <summary>
+    /// Получение события по ИД
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
     // GET: api/events/{id}
     [HttpGet("{id}")]
-    public IActionResult GetById(Guid id)
+    public IActionResult GetById([FromRoute] Guid id)
     {
         var eventEntity = _eventService.GetByIdEvent(id);
         if (eventEntity == null)
@@ -29,6 +40,11 @@ public class EventsController : ControllerBase
 
         return Ok(MapToResponse(eventEntity));
     }
+    /// <summary>
+    /// Создание события
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
     // POST: api/events
     [HttpPost]
     public IActionResult Create([FromBody] CreateEventRequest request)
@@ -53,7 +69,12 @@ public class EventsController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
-
+    /// <summary>
+    /// Обновление события (полное)
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="request"></param>
+    /// <returns></returns>
     // PUT: api/events/{id}
     [HttpPut("{id}")]
     public IActionResult Update(Guid id, [FromBody] UpdateEventRequest request)
@@ -80,7 +101,11 @@ public class EventsController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
-
+    /// <summary>
+    /// Удаление события по ИД
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
     // DELETE: api/events/{id}
     [HttpDelete("{id}")]
     public IActionResult Delete(Guid id)

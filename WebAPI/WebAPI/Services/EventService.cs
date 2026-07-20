@@ -37,8 +37,24 @@ public class EventService : IEventService
      public Event? GetByIdEvent(Guid id){
         return _events.FirstOrDefault(e => e.Id == id);
      }
-    public List<Event> GetAllEvent()
+    public IQueryable<Event> GetAllEvent(string? title, DateTime? from, DateTime? to)
     {
-        return _events.OrderByDescending(e => e.StartAt).ToList();
+        
+       var query =  _events.OrderByDescending(e => e.StartAt).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            query = query.Where(e => e.Title.Contains(title, StringComparison.CurrentCultureIgnoreCase));
+        }
+        if (from.HasValue)
+        {
+            query = query.Where(e => e.StartAt >= from.Value.ToUniversalTime());
+        }
+        if (to.HasValue)
+        {
+             query = query.Where(e => e.StartAt <= to.Value.ToUniversalTime());
+        }
+
+        return query;
     }
 }

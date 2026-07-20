@@ -1,3 +1,5 @@
+using System.Reflection;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -7,7 +9,14 @@ var builder = WebApplication.CreateBuilder(args);
 //builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options => {var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    
+    // Если файл существует — подключаем его
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }});
 // Потому что данные в памяти 
 builder.Services.AddSingleton<IEventService, EventService>();
 var app = builder.Build();

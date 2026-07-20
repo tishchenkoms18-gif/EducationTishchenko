@@ -37,5 +37,5 @@ public interface IEventService
     /// Получить список всех событий
     /// </summary>
     /// <returns></returns>
-    public List<Event> GetAllEvent();
+    public IQueryable<Event> GetAllEvent(string? title = null , DateTime? from = null , DateTime? to = null);
 }
