@@ -37,5 +37,5 @@ public interface IEventService
     /// Получить список всех событий
     /// </summary>
     /// <returns></returns>
-    public IQueryable<Event> GetAllEvent(string? title = null , DateTime? from = null , DateTime? to = null);
+    public PaginatedResult<Event> GetAllEvent(string? title = null , DateTime? from = null , DateTime? to = null, int page = 1, int pageSize = 10);
 }

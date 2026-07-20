@@ -37,7 +37,7 @@ public class EventService : IEventService
      public Event? GetByIdEvent(Guid id){
         return _events.FirstOrDefault(e => e.Id == id);
      }
-    public IQueryable<Event> GetAllEvent(string? title, DateTime? from, DateTime? to)
+    public PaginatedResult<Event> GetAllEvent(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10 )
     {
         
        var query =  _events.OrderByDescending(e => e.StartAt).AsQueryable();
@@ -55,6 +55,22 @@ public class EventService : IEventService
              query = query.Where(e => e.StartAt <= to.Value.ToUniversalTime());
         }
 
-        return query;
+        // Сортировка и пагинация
+    // Сортировка и пагинация
+    var totalCount = query.Count();
+    var items = query
+        .OrderByDescending(e => e.CreatedAt)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    return new PaginatedResult<Event>
+    {
+        TotalCount = totalCount,
+        Items = items,
+        PageNumber = page,
+        PageSize = pageSize,
+        TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+    };
     }
 }

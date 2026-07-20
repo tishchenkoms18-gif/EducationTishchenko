@@ -8,6 +8,7 @@ public class Event
     public string? Description { get; private set; }
     public DateTime StartAt { get; private set; }
     public DateTime EndAt { get; private set; }
+    public DateTime CreatedAt { get; private set; }
 
      public static Event Create(string title, string? description, DateTime startAt, DateTime endAt)
     {
@@ -19,7 +20,8 @@ public class Event
             Title = title,
             Description = description,
             StartAt = startAt.ToUniversalTime(),
-            EndAt = endAt.ToUniversalTime()
+            EndAt = endAt.ToUniversalTime(),
+            CreatedAt = DateTime.UtcNow
         };
     }
 

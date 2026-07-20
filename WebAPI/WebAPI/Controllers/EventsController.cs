@@ -17,13 +17,28 @@ public class EventsController : ControllerBase
 /// <param name="title">Поиск по названию (частичное совпадение, регистронезависимый)</param>
 /// <param name="from">События, начинающиеся не раньше указанной даты</param>
 /// <param name="to">События, заканчивающиеся не позже указанной даты</param>
+/// <param name="page">Cтраница, которую необходимо вернуть</param>
+/// <param name="pageSize">Количество элементов на странице</param>
 /// <returns></returns>
     // GET: api/events
     [HttpGet]
-    public IActionResult GetAll([FromQuery] string? title, [FromQuery] DateTime? from,[FromQuery] DateTime? to)
+    public IActionResult GetAll([FromQuery] string? title, [FromQuery] DateTime? from,[FromQuery] DateTime? to, int page = 1, int pageSize = 10 )
     {
-        var events =  _eventService.GetAllEvent().ToList();
-        return Ok(events.Select(MapToResponse));
+        if(page < 1)
+        {
+            return BadRequest(new { error = "Номер страницы должен быть больше 0" });
+        }
+        var events =  _eventService.GetAllEvent(title, from, to, page, pageSize);
+        var response = new PaginatedResult<EventResponse>
+        {
+            TotalCount = events.TotalCount,
+            Items = events.Items.Select(MapToResponse).ToList(),
+            PageNumber = events.PageNumber,
+            PageSize = events.PageSize,
+            TotalPages = events.TotalPages
+        };
+
+        return Ok(response);
     }
     /// <summary>
     /// Получение события по ИД
@@ -135,7 +150,8 @@ public class EventsController : ControllerBase
             Title = eventEntity.Title,
             Description = eventEntity.Description,
             StartAt = eventEntity.StartAt,
-            EndAt = eventEntity.EndAt
+            EndAt = eventEntity.EndAt,
+            CreatedAt = eventEntity.CreatedAt
         };
     }
 }
