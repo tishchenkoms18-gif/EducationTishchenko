@@ -12,6 +12,12 @@ public interface IEventService
     /// <param name="endAt"></param>
     /// <param name="cancellationToken"></param>
     public Event CreateEvent(string title, string? description, DateTime startAt, DateTime endAt, CancellationToken cancellationToken = default);
+   /// <summary>
+    /// Создание нескольких событий
+    /// </summary>
+    /// <param name="eventRequests">Список запросов на создание</param>
+    /// <returns>Список созданных событий</returns>
+    public List<Event> CreateEvents(List<CreateEventRequest> eventRequests);
     /// <summary>
     /// Обновить событие
     /// </summary>
@@ -20,6 +26,7 @@ public interface IEventService
     /// <param name="description"></param>
     /// <param name="startAt"></param>
     /// <param name="endAt"></param>
+    
     public Event UpdateEvent(Guid id, string title, string? description, DateTime startAt, DateTime endAt);
     /// <summary>
     /// Удалить событие
@@ -38,4 +45,5 @@ public interface IEventService
     /// </summary>
     /// <returns></returns>
     public PaginatedResult<Event> GetAllEvent(string? title = null , DateTime? from = null , DateTime? to = null, int page = 1, int pageSize = 10);
+    
 }

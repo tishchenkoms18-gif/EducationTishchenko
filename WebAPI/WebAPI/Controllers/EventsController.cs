@@ -84,6 +84,45 @@ public class EventsController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+    
+    /// <summary>
+    /// Создание нескольких событий за один запрос
+    /// </summary>
+    /// <param name="request">Список событий для создания</param>
+    /// <returns>Список созданных событий</returns>
+    /// <response code="201">Все события успешно созданы</response>
+    /// <response code="400">Ошибка валидации или превышено максимальное количество</response>
+    [HttpPost("batch")]
+    public IActionResult CreateBatch([FromBody] CreateEventsRequest request)
+    {
+        try
+        {
+            if (request.Events == null || !request.Events.Any())
+                return BadRequest(new { error = "Список событий не может быть пустым" });
+
+            if (request.Events.Count > 100)
+                return BadRequest(new { error = "Нельзя создать более 100 событий за раз" });
+
+            var createdEvents = _eventService.CreateEvents(request.Events);
+
+            var response = new
+            {
+                TotalCreated = createdEvents.Count,
+                Events = createdEvents.Select(MapToResponse).ToList(),
+                Message = $"Успешно создано {createdEvents.Count} событий"
+            };
+
+            return CreatedAtAction(nameof(GetAll), response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { error = "Внутренняя ошибка сервера" });
+        }
+    }
     /// <summary>
     /// Обновление события (полное)
     /// </summary>

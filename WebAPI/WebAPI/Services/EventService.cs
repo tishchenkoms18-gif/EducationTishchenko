@@ -15,11 +15,42 @@ public class EventService : IEventService
         _logger.LogInformation("Создано событие: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
         return eventEntity;
     }
+    public List<Event> CreateEvents(List<CreateEventRequest> eventRequests)
+    {
+        if (eventRequests == null || !eventRequests.Any())
+            throw new ArgumentException("Список событий не может быть пустым");
+        var createdEvents = new List<Event>();
 
+        foreach (var request in eventRequests)
+        {
+            try
+            {
+                var eventEntity = Event.Create(
+                    request.Title,
+                    request.Description,
+                    request.StartAt,
+                    request.EndAt);
+
+                _events.Add(eventEntity);
+                createdEvents.Add(eventEntity);
+            }
+            catch (ArgumentException ex)
+            {
+                // Можно либо пропускать ошибочные, либо прерывать весь процесс
+                // Здесь мы выбрасываем исключение с информацией о том, какое событие вызвало проблему
+                throw new ArgumentException($"Ошибка при создании события '{request.Title}': {ex.Message}", ex);
+            }
+        }
+
+        _logger.LogInformation("Создано {Count} событий за один запрос", createdEvents.Count);
+
+        return createdEvents; 
+
+    }
     public Event UpdateEvent(Guid id, string title, string? description, DateTime startAt, DateTime endAt)
     {
          var eventEntity = _events.FirstOrDefault(e => e.Id == id) ??  throw new KeyNotFoundException();
-        _logger.LogInformation("Создано изменено: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
+        _logger.LogInformation("Событие изменено: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
         eventEntity.Update(title, description, startAt, endAt);
         return eventEntity;
     }
