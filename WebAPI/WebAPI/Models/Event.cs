@@ -4,12 +4,32 @@
 public class Event
 {
     public Guid Id { get; private set; }  
-    public string Title { get; private set; }
+    public string Title { get; private set; } = null!; 
     public string? Description { get; private set; }
     public DateTime StartAt { get; private set; }
     public DateTime EndAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+
+// Для EF Core (без параметров)
+    private Event() { }
+
+    // Приватный конструктор с параметрами
+    private Event(
+        Guid id,
+        string title,
+        string? description,
+        DateTime startAt,
+        DateTime endAt,
+        DateTime createdAt)
+    {
+        Id = id;
+        Title = title;
+        Description = description;
+        StartAt = startAt;
+        EndAt = endAt;
+        CreatedAt = createdAt;
+    }
      public static Event Create(string title, string? description, DateTime startAt, DateTime endAt)
     {
         Validate(title, startAt, endAt);

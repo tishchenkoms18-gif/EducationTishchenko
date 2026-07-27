@@ -12,7 +12,7 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
-     <ProjectReference Include="..\WebAPI\WebAPI.csproj" />
+     <ProjectReference Include="..\WebAPI\WebAPI.Tests.csproj" />
   </ItemGroup>
 
 </Project>
