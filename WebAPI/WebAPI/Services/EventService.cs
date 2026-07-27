@@ -65,8 +65,13 @@ public class EventService : IEventService
         return true;
     }
 
-     public Event? GetByIdEvent(Guid id){
-        return _events.FirstOrDefault(e => e.Id == id);
+     public Event GetByIdEvent(Guid id){
+        var eventEntity = _events.FirstOrDefault(e => e.Id == id);
+    
+        if (eventEntity == null)
+            throw new EventNotFoundException(id);
+    
+        return eventEntity;
      }
     public PaginatedResult<Event> GetAllEvent(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10 )
     {

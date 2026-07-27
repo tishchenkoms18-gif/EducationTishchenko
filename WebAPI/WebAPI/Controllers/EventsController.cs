@@ -49,11 +49,15 @@ public class EventsController : ControllerBase
     [HttpGet("{id}")]
     public IActionResult GetById([FromRoute] Guid id)
     {
+       try
+    {
         var eventEntity = _eventService.GetByIdEvent(id);
-        if (eventEntity == null)
-            return NotFound($"Событие с ID {id} не найдено");
-
         return Ok(MapToResponse(eventEntity));
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(new { error = ex.Message });
+    }
     }
     /// <summary>
     /// Создание события

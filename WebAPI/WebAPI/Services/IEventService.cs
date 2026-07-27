@@ -39,7 +39,7 @@ public interface IEventService
     /// </summary>
     /// <param name="id"></param>
     /// <returns></returns>
-    public Event? GetByIdEvent(Guid id);
+    public Event GetByIdEvent(Guid id);
     /// <summary>
     /// Получить список всех событий
     /// </summary>
