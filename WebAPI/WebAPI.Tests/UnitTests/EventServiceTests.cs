@@ -111,14 +111,11 @@ public class EventServiceTests
         var testEvents = TestData.GetSampleEvents(_eventService);
         var eventToDelete = testEvents.First();
 
-        var result = _eventService.DeleteEvent(eventToDelete.Id);
+        _eventService.DeleteEvent(eventToDelete.Id);
 
         // Assert
-        Assert.True(result);
-        
-        var exception = Assert.Throws<EventNotFoundException>(() =>
+       var exception = Assert.Throws<EventNotFoundException>(() =>
         _eventService.GetByIdEvent(eventToDelete.Id));
-    
         Assert.Equal(eventToDelete.Id, exception.EventId);
     }
 
@@ -139,7 +136,7 @@ public class EventServiceTests
             Assert.DoesNotContain("F#", ev.Title);
         }
     }
-
+    
     [Fact]
     public void FilterByDateRange_ShouldReturnEventsWithinRange()
     {
@@ -216,7 +213,15 @@ public class EventServiceTests
         Assert.Equal($"Событие с ID '{nonExistentId}' не найдено.", exception.Message);
 
     }
-
+    [Fact]
+    public void UpdateEvent_ShouldThrowEventNotFoundException_WhenEventDoesNotExist() 
+    {
+        var nonExistentId = Guid.NewGuid();
+        var exception = Assert.Throws<EventNotFoundException>(() =>
+            _eventService.UpdateEvent(nonExistentId, "Title", null, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2)));
+        Assert.Equal($"Событие с ID '{nonExistentId}' не найдено.", exception.Message);
+        Assert.Equal(nonExistentId, exception.EventId);
+    }
     [Fact]
     public void DeleteEvent_ShouldReturnFalse_WhenEventDoesNotExist()
     {
@@ -224,10 +229,10 @@ public class EventServiceTests
         var nonExistentId = Guid.NewGuid();
 
         // Act
-        var result = _eventService.DeleteEvent(nonExistentId);
-
-        // Assert
-        Assert.False(result);
+         var exception = Assert.Throws<EventNotFoundException>(() =>
+        _eventService.DeleteEvent(nonExistentId));
+        Assert.Equal($"Событие с ID '{nonExistentId}' не найдено.", exception.Message);
+        Assert.Equal(nonExistentId, exception.EventId);
     }
 
     [Fact]

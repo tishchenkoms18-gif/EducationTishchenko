@@ -47,13 +47,14 @@ public static class TestData
         return new List<Event>
         {
             
-            
-            
             service.CreateEvent("Current Event", "Test Current", 
                 baseDate.AddDays(1), baseDate.AddDays(2)),
             
             service.CreateEvent("Future Event", "Test Future", 
-                baseDate.AddDays(10), baseDate.AddDays(11))
+                baseDate.AddDays(10), baseDate.AddDays(11)),
+
+            service.CreateEvent("Event ",  null, 
+                baseDate.AddDays(4),baseDate.AddDays(8))
         };
     }
 }
