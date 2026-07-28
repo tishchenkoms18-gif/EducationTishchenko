@@ -49,7 +49,7 @@ public class EventService : IEventService
     }
     public Event UpdateEvent(Guid id, string title, string? description, DateTime startAt, DateTime endAt)
     {
-         var eventEntity = _events.FirstOrDefault(e => e.Id == id) ??  throw new KeyNotFoundException();
+         var eventEntity = _events.FirstOrDefault(e => e.Id == id) ??  throw new EventNotFoundException(id);
         _logger.LogInformation("Событие изменено: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
         eventEntity.Update(title, description, startAt, endAt);
         return eventEntity;
