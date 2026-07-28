@@ -33,7 +33,7 @@ public interface IEventService
     /// </summary>
     /// <param name="id"></param>
     /// <returns></returns>
-    public bool DeleteEvent(Guid id);
+    public void DeleteEvent(Guid id);
     /// <summary>
     /// Найти событие по ид 
     /// </summary>

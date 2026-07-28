@@ -28,6 +28,10 @@ public class EventsController : ControllerBase
         {
             return BadRequest(new { error = "Номер страницы должен быть больше 0" });
         }
+
+        if (pageSize < 1 || pageSize > 100)
+        return BadRequest(new { error = "Размер страницы должен быть от 1 до 100" });
+
         var events =  _eventService.GetAllEvent(title, from, to, page, pageSize);
         var response = new PaginatedResult<EventResponse>
         {
@@ -137,8 +141,7 @@ public class EventsController : ControllerBase
     [HttpPut("{id}")]
     public IActionResult Update(Guid id, [FromBody] UpdateEventRequest request)
     {
-        try
-        {
+        
             ValidateRequest(request.Title, request.StartAt, request.EndAt);
 
             var eventEntity = _eventService.UpdateEvent(
@@ -149,15 +152,7 @@ public class EventsController : ControllerBase
                 request.EndAt);
 
             return Ok(MapToResponse(eventEntity));
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound($"Событие с ID {id} не найдено");
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+       
     }
     /// <summary>
     /// Удаление события по ИД
@@ -168,10 +163,7 @@ public class EventsController : ControllerBase
     [HttpDelete("{id}")]
     public IActionResult Delete(Guid id)
     {
-        var result = _eventService.DeleteEvent(id);
-        if (!result)
-            return NotFound($"Событие с ID {id} не найдено");
-
+        _eventService.DeleteEvent(id); 
         return NoContent();
     }
 

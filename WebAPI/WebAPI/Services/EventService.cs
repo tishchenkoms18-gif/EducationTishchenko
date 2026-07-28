@@ -54,15 +54,13 @@ public class EventService : IEventService
         eventEntity.Update(title, description, startAt, endAt);
         return eventEntity;
     }
-     public bool DeleteEvent(Guid id)
+     public void  DeleteEvent(Guid id)
     {
          var eventEntity = _events.FirstOrDefault(e => e.Id == id);
-        if (eventEntity == null)
-            return false;
-
+    if (eventEntity == null)
+        throw new EventNotFoundException(id);
+    
         _events.Remove(eventEntity);
-        _logger.LogInformation("Удалено событие: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
-        return true;
     }
 
      public Event GetByIdEvent(Guid id){
@@ -88,7 +86,7 @@ public class EventService : IEventService
         }
         if (to.HasValue)
         {
-             query = query.Where(e => e.StartAt <= to.Value.ToUniversalTime());
+             query = query.Where(e => e.EndAt <= to.Value.ToUniversalTime());
         }
 
         // Сортировка и пагинация
