@@ -90,4 +90,43 @@ public class BookingServiceTests
         Assert.Equal(BookingStatus.Rejected, updated.Status);
         Assert.NotNull(updated.ProcessedAt);
     }
+
+    // Неуспешные сценарии
+
+    [Fact]
+    public async Task CreateBookingAsync_ShouldThrowArgumentException_WhenEventIdIsEmpty()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => _bookingService.CreateBookingAsync(Guid.Empty));
+    }
+
+    [Fact]
+    public async Task GetBookingByIdAsync_ShouldThrowBookingNotFoundException_WhenBookingDoesNotExist()
+    {
+        // Arrange
+        var nonExistentId = Guid.NewGuid();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<BookingNotFoundException>(() => _bookingService.GetBookingByIdAsync(nonExistentId));
+    }
+
+    [Fact]
+    public async Task ConfirmBookingAsync_ShouldThrowBookingNotFoundException_WhenBookingDoesNotExist()
+    {
+        // Arrange
+        var nonExistentId = Guid.NewGuid();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<BookingNotFoundException>(() => _bookingService.ConfirmBookingAsync(nonExistentId));
+    }
+
+    [Fact]
+    public async Task RejectBookingAsync_ShouldThrowBookingNotFoundException_WhenBookingDoesNotExist()
+    {
+        // Arrange
+        var nonExistentId = Guid.NewGuid();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<BookingNotFoundException>(() => _bookingService.RejectBookingAsync(nonExistentId));
+    }
 }
