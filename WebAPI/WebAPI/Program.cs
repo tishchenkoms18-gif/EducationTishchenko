@@ -20,6 +20,7 @@ builder.Services.AddSwaggerGen(options => {var xmlFile = $"{Assembly.GetExecutin
 // Потому что данные в памяти 
 builder.Services.AddSingleton<IEventService, EventService>();
 builder.Services.AddSingleton<IBookingService, BookingService>();
+builder.Services.AddHostedService<BookingBackgroundService>();
 var app = builder.Build();
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
