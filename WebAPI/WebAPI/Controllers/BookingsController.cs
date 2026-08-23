@@ -24,15 +24,7 @@ public class BookingsController : ControllerBase
        var booking = await _bookingService.GetBookingByIdAsync(id);
         return Ok(MapToResponse(booking));
     }
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="id"></param>
-    [HttpPost("{id}")]
-    public async Task<IActionResult> Add(){
-        return Ok();
-    }
-
+   
     private static BookingResponse MapToResponse(Booking booking)
     {
         return new BookingResponse
