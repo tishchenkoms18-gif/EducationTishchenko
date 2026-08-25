@@ -97,7 +97,7 @@ public async Task<IActionResult> BookEventAsync(Guid id)
     };
 
     return AcceptedAtAction(
-        actionName: "GetBookingById",    // имя метода в BookingsController
+        actionName: "GetById",    // имя метода в BookingsController
         controllerName: "Bookings",
         routeValues: new { id = booking.Id },
         value: response);
