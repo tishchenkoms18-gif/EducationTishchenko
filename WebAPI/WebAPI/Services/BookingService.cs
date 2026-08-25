@@ -11,6 +11,10 @@ public class BookingService : IBookingService
     } 
     public async Task<Booking> CreateBookingAsync(Guid eventId)
     {
+
+        if (eventId == Guid.Empty)
+        throw new ArgumentException("EventId не может быть пустым", nameof(eventId));
+        
         var eventEntity = _eventService.GetByIdEvent(eventId);
         if (eventEntity == null)
             throw new EventNotFoundException(eventId);
