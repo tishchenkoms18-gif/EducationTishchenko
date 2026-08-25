@@ -74,15 +74,7 @@ public class EventsController : ControllerBase
 [HttpPost("{id}/book")]
 public async Task<IActionResult> BookEventAsync(Guid id)
 {
-    try
-    {
-        var eventExists = _eventService.GetByIdEvent(id);
-    }
-    catch (EventNotFoundException)
-    {
-        return NotFound($"Событие с ID {id} не найдено");
-    }
-
+    
     // Создаём бронь
     var booking = await _bookingService.CreateBookingAsync(id);
 

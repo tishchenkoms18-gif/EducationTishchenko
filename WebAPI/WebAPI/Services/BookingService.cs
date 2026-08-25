@@ -2,13 +2,19 @@ public class BookingService : IBookingService
 {
     private readonly List<Booking> _bookings = new();
     private readonly ILogger<BookingService> _logger;
+    private readonly IEventService _eventService;
 
-    public BookingService(ILogger<BookingService> logger)
+    public BookingService(ILogger<BookingService> logger, IEventService eventService)
     {
         _logger = logger;
+        _eventService = eventService;
     } 
     public async Task<Booking> CreateBookingAsync(Guid eventId)
     {
+        var eventEntity = _eventService.GetByIdEvent(eventId);
+        if (eventEntity == null)
+            throw new EventNotFoundException(eventId);
+
         var bookingEntity = Booking.Create(eventId);
 
         _bookings.Add(bookingEntity);
