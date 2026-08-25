@@ -9,7 +9,7 @@ public class BookingNotFoundException : Exception
     public Guid BookingId { get; }
 
     public BookingNotFoundException(Guid bookingId)
-        : base($"Событие с ID '{bookingId}' не найдено.")
+        : base($"Бронирование с ID '{bookingId}' не найдено.")
     {
         BookingId = bookingId;
     }

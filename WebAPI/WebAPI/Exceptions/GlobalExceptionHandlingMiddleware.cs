@@ -60,6 +60,7 @@ public class GlobalExceptionHandlingMiddleware
             EventValidationException => StatusCodes.Status400BadRequest,
             // Ресурс не найден
              KeyNotFoundException => StatusCodes.Status404NotFound,
+             BookingNotFoundException => StatusCodes.Status404NotFound, 
              EventNotFoundException => StatusCodes.Status404NotFound,
              _ => StatusCodes.Status500InternalServerError
         };
