@@ -6,10 +6,12 @@ public class EventsController : ControllerBase
 {
     
     private readonly IEventService _eventService;
+    private readonly IBookingService _bookingService;
 
-    public EventsController(IEventService eventService)
+    public EventsController(IEventService eventService, IBookingService bookingService)
     {
         _eventService = eventService;
+        _bookingService = bookingService;
     }
 /// <summary>
 /// Получить список всех событий с фильтрацией
@@ -63,6 +65,35 @@ public class EventsController : ControllerBase
         return NotFound(new { error = ex.Message });
     }
     }
+    
+    /// <summary>
+/// Создать бронирование на событие (быстрый ответ 202 Accepted)
+/// </summary>
+/// <param name="id">Идентификатор события</param>
+/// <returns>202 Accepted + Location</returns>
+[HttpPost("{id}/book")]
+public async Task<IActionResult> BookEventAsync(Guid id)
+{
+    
+    // Создаём бронь
+    var booking = await _bookingService.CreateBookingAsync(id);
+
+    // Формируем ответ 202 Accepted с Location
+    var response = new BookingResponse
+    {
+        Id = booking.Id,
+        EventId = booking.EventId,
+        Status = booking.Status.ToString(),
+        CreatedAt = booking.CreatedAt,
+        ProcessedAt = booking.ProcessedAt
+    };
+
+    return AcceptedAtAction(
+        actionName: "GetById",    // имя метода в BookingsController
+        controllerName: "Bookings",
+        routeValues: new { id = booking.Id },
+        value: response);
+}
     /// <summary>
     /// Создание события
     /// </summary>
