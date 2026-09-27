@@ -2,6 +2,7 @@
 using Xunit;
 using Moq;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 
 namespace WebAPI.Tests.UnitTests.Services;
@@ -9,31 +10,29 @@ namespace WebAPI.Tests.UnitTests.Services;
 public class BookingServiceTests
 {
     private readonly Mock<IEventService> _eventServiceMock;
-    private readonly IBookingService _bookingService;
-    
+    private readonly BookingService _bookingService;
 
     public BookingServiceTests()
     {
-
         _eventServiceMock = new Mock<IEventService>();
         var loggerMock = new Mock<ILogger<BookingService>>();
         _bookingService = new BookingService(loggerMock.Object, _eventServiceMock.Object);
-
-       
-        
     }
+
+    // =============================================
+    // УСПЕШНЫЕ СЦЕНАРИИ
+    // =============================================
 
     [Fact]
     public async Task CreateBookingAsync_ShouldCreateBookingWithPendingStatus()
     {
         // Arrange
         var eventId = Guid.NewGuid();
-        var existingEvent = CreateEventWithId(eventId);
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 10);
 
-
-_eventServiceMock
-        .Setup(x => x.GetByIdEvent(eventId))
-        .Returns(existingEvent); 
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))    // ✅ async
+            .ReturnsAsync(existingEvent);
 
         // Act
         var booking = await _bookingService.CreateBookingAsync(eventId);
@@ -46,12 +45,57 @@ _eventServiceMock
     }
 
     [Fact]
+    public async Task CreateBookingAsync_ShouldDecreaseAvailableSeats()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 5);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
+        // Act
+        await _bookingService.CreateBookingAsync(eventId);
+
+        // Assert
+        Assert.Equal(4, existingEvent.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task CreateMultipleBookings_ShouldHaveUniqueIds()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 10);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
+        // Act
+        var booking1 = await _bookingService.CreateBookingAsync(eventId);
+        var booking2 = await _bookingService.CreateBookingAsync(eventId);
+        var booking3 = await _bookingService.CreateBookingAsync(eventId);
+
+        // Assert
+        Assert.NotEqual(booking1.Id, booking2.Id);
+        Assert.NotEqual(booking2.Id, booking3.Id);
+        Assert.NotEqual(booking1.Id, booking3.Id);
+        Assert.Equal(7, existingEvent.AvailableSeats); // 10 - 3
+    }
+
+    [Fact]
     public async Task GetBookingByIdAsync_ShouldReturnBooking_WhenExists()
     {
         // Arrange
         var eventId = Guid.NewGuid();
-         var existingEvent = CreateEventWithId(eventId);
-        _eventServiceMock.Setup(x => x.GetByIdEvent(eventId)).Returns(existingEvent);
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 10);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
         var created = await _bookingService.CreateBookingAsync(eventId);
 
         // Act
@@ -64,23 +108,16 @@ _eventServiceMock
     }
 
     [Fact]
-    public async Task GetBookingByIdAsync_ShouldThrowBookingNotFoundException_WhenNotExists()
-    {
-        // Arrange
-        var nonExistentId = Guid.NewGuid();
-
-        // Act & Assert
-        await Assert.ThrowsAsync<BookingNotFoundException>(() =>
-            _bookingService.GetBookingByIdAsync(nonExistentId));
-    }
-
-    [Fact]
     public async Task ConfirmBookingAsync_ShouldChangeStatusToConfirmed()
     {
         // Arrange
         var eventId = Guid.NewGuid();
-         var existingEvent = CreateEventWithId(eventId);
-        _eventServiceMock.Setup(x => x.GetByIdEvent(eventId)).Returns(existingEvent);
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 10);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
         var booking = await _bookingService.CreateBookingAsync(eventId);
 
         // Act
@@ -97,8 +134,12 @@ _eventServiceMock
     {
         // Arrange
         var eventId = Guid.NewGuid();
-         var existingEvent = CreateEventWithId(eventId);
-        _eventServiceMock.Setup(x => x.GetByIdEvent(eventId)).Returns(existingEvent);
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 10);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
         var booking = await _bookingService.CreateBookingAsync(eventId);
 
         // Act
@@ -110,42 +151,59 @@ _eventServiceMock
         Assert.NotNull(updated.ProcessedAt);
     }
 
-    // Неуспешные сценарии
+    [Fact]
+    public async Task RejectBookingAsync_ShouldReleaseSeats()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 1);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
+        var booking = await _bookingService.CreateBookingAsync(eventId);
+        Assert.Equal(0, existingEvent.AvailableSeats);
+
+        // Act
+        await _bookingService.RejectBookingAsync(booking.Id);
+
+        // Assert
+        Assert.Equal(1, existingEvent.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task RejectBookingAsync_ThenNewBooking_ShouldSucceed()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 1);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
+        var firstBooking = await _bookingService.CreateBookingAsync(eventId);
+
+        // Act
+        await _bookingService.RejectBookingAsync(firstBooking.Id);
+        var secondBooking = await _bookingService.CreateBookingAsync(eventId);
+
+        // Assert
+        Assert.NotNull(secondBooking);
+        Assert.NotEqual(firstBooking.Id, secondBooking.Id);
+        Assert.Equal(0, existingEvent.AvailableSeats);
+    }
+
+    // =============================================
+    // НЕУСПЕШНЫЕ СЦЕНАРИИ
+    // =============================================
 
     [Fact]
     public async Task CreateBookingAsync_ShouldThrowArgumentException_WhenEventIdIsEmpty()
     {
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => _bookingService.CreateBookingAsync(Guid.Empty));
-    }
-
-    [Fact]
-    public async Task GetBookingByIdAsync_ShouldThrowBookingNotFoundException_WhenBookingDoesNotExist()
-    {
-        // Arrange
-        var nonExistentId = Guid.NewGuid();
-
-        // Act & Assert
-        await Assert.ThrowsAsync<BookingNotFoundException>(() => _bookingService.GetBookingByIdAsync(nonExistentId));
-    }
-
-    [Fact]
-    public async Task ConfirmBookingAsync_ShouldThrowBookingNotFoundException_WhenBookingDoesNotExist()
-    {
-        // Arrange
-        var nonExistentId = Guid.NewGuid();
-
-        // Act & Assert
-        await Assert.ThrowsAsync<BookingNotFoundException>(() => _bookingService.ConfirmBookingAsync(nonExistentId));
-    }
-
-    [Fact]
-    public async Task RejectBookingAsync_ShouldThrowBookingNotFoundException_WhenBookingDoesNotExist()
-    {
-        // Arrange
-        var nonExistentId = Guid.NewGuid();
-        // Act & Assert
-        await Assert.ThrowsAsync<BookingNotFoundException>(() => _bookingService.RejectBookingAsync(nonExistentId));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _bookingService.CreateBookingAsync(Guid.Empty));
     }
 
     [Fact]
@@ -153,9 +211,10 @@ _eventServiceMock
     {
         // Arrange
         var eventId = Guid.NewGuid();
+
         _eventServiceMock
-            .Setup(x => x.GetByIdEvent(eventId))
-            .Returns((Event)null); // событие не найдено
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ThrowsAsync(new EventNotFoundException(eventId));   // ✅ async
 
         // Act & Assert
         await Assert.ThrowsAsync<EventNotFoundException>(() =>
@@ -163,43 +222,138 @@ _eventServiceMock
     }
 
     [Fact]
-    public async Task CreateBookingAsync_ShouldThrowEventNotFoundException_WhenEventWasDeleted()
+    public async Task CreateBookingAsync_ShouldThrowNoAvailableSeatsException_WhenNoSeats()
     {
         // Arrange
         var eventId = Guid.NewGuid();
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 1);
+
         _eventServiceMock
-            .Setup(x => x.GetByIdEvent(eventId))
-            .Throws(new EventNotFoundException(eventId)); // событие удалено
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
+        // Занимаем единственное место
+        await _bookingService.CreateBookingAsync(eventId);
 
         // Act & Assert
-        await Assert.ThrowsAsync<EventNotFoundException>(() =>
+        await Assert.ThrowsAsync<NoAvailableSeatsException>(() =>
             _bookingService.CreateBookingAsync(eventId));
     }
-    private Event CreateEventWithId(Guid id, string title = "Test Event")
-    {
-        return (Event)Activator.CreateInstance(
-            typeof(Event),
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
-            null,
-            new object[] { id, title, null, DateTime.UtcNow, DateTime.UtcNow.AddDays(1), DateTime.UtcNow },
-            null)!;
-    }
+
     [Fact]
-    public async Task CreateBookingAsync_ShouldCreateBooking_WhenEventExists()
-{
-    // Arrange
-    var eventId = Guid.NewGuid();
-    var existingEvent = CreateEventWithId(eventId); // 👈 используем рефлексию
+    public async Task GetBookingByIdAsync_ShouldThrowBookingNotFoundException_WhenNotExists()
+    {
+        var nonExistentId = Guid.NewGuid();
 
-    _eventServiceMock
-        .Setup(x => x.GetByIdEvent(eventId))
-        .Returns(existingEvent);
+        await Assert.ThrowsAsync<BookingNotFoundException>(() =>
+            _bookingService.GetBookingByIdAsync(nonExistentId));
+    }
 
-    // Act
-    var booking = await _bookingService.CreateBookingAsync(eventId);
+    [Fact]
+    public async Task ConfirmBookingAsync_ShouldThrowBookingNotFoundException_WhenNotExists()
+    {
+        var nonExistentId = Guid.NewGuid();
 
-    // Assert
-    Assert.Equal(eventId, booking.EventId);
-    Assert.Equal(BookingStatus.Pending, booking.Status);
-}
+        await Assert.ThrowsAsync<BookingNotFoundException>(() =>
+            _bookingService.ConfirmBookingAsync(nonExistentId));
+    }
+
+    [Fact]
+    public async Task RejectBookingAsync_ShouldThrowBookingNotFoundException_WhenNotExists()
+    {
+        var nonExistentId = Guid.NewGuid();
+
+        await Assert.ThrowsAsync<BookingNotFoundException>(() =>
+            _bookingService.RejectBookingAsync(nonExistentId));
+    }
+
+    // =============================================
+    // ТЕСТЫ НА КОНКУРЕНТНОСТЬ
+    // =============================================
+
+    [Fact]
+    public async Task ConcurrentBookings_ShouldNotExceedTotalSeats()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 5);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
+        const int concurrentRequests = 20;
+        int successCount = 0;
+        int conflictCount = 0;
+        var lockObj = new object();
+
+        // Act
+        var tasks = Enumerable.Range(0, concurrentRequests).Select(_ => Task.Run(async () =>
+        {
+            try
+            {
+                await _bookingService.CreateBookingAsync(eventId);
+                lock (lockObj) successCount++;
+            }
+            catch (NoAvailableSeatsException)
+            {
+                lock (lockObj) conflictCount++;
+            }
+        }));
+
+        await Task.WhenAll(tasks);
+
+        // Assert
+        Assert.Equal(5, successCount);
+        Assert.Equal(15, conflictCount);
+        Assert.Equal(0, existingEvent.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task ConcurrentBookings_ShouldHaveUniqueIds()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        var existingEvent = CreateTestEvent(eventId, totalSeats: 10);
+
+        _eventServiceMock
+            .Setup(x => x.GetByIdEventAsync(eventId))
+            .ReturnsAsync(existingEvent);
+
+        var ids = new ConcurrentBag<Guid>();
+
+        // Act
+        var tasks = Enumerable.Range(0, 10).Select(_ => Task.Run(async () =>
+        {
+            var booking = await _bookingService.CreateBookingAsync(eventId);
+            ids.Add(booking.Id);
+        }));
+
+        await Task.WhenAll(tasks);
+
+        // Assert
+        Assert.Equal(10, ids.Count);
+        Assert.Equal(10, ids.Distinct().Count());
+    }
+
+    // =============================================
+    // ХЕЛПЕР
+    // =============================================
+
+    private static Event CreateTestEvent(Guid id, int totalSeats = 10)
+    {
+        var eventEntity = Event.Create(
+            "Test Event",
+            null,
+            DateTime.UtcNow.AddDays(1),
+            DateTime.UtcNow.AddDays(2),
+            totalSeats);
+
+        // Устанавливаем нужный Id через рефлексию
+        typeof(Event)
+            .GetProperty(nameof(Event.Id))!
+            .SetValue(eventEntity, id);
+
+        return eventEntity;
+    }
 }
