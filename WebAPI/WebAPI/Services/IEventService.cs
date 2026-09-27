@@ -1,3 +1,7 @@
+
+
+namespace WebAPI.Services;
+
 /// <summary>
 /// Контракт сервиса для управления мероприятиями
 /// </summary>
@@ -6,44 +10,50 @@ public interface IEventService
     /// <summary>
     /// Создать новое событие
     /// </summary>
-    /// <param name="title"></param>
-    /// <param name="description"></param>
-    /// <param name="startAt"></param>
-    /// <param name="endAt"></param>
-    /// <param name="cancellationToken"></param>
-    public Event CreateEvent(string title, string? description, DateTime startAt, DateTime endAt, CancellationToken cancellationToken = default);
-   /// <summary>
+    Task<Event> CreateEventAsync(
+        string title,
+        string? description,
+        DateTime startAt,
+        DateTime endAt,
+        int totalSeats,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Создание нескольких событий
     /// </summary>
-    /// <param name="eventRequests">Список запросов на создание</param>
-    /// <returns>Список созданных событий</returns>
-    public List<Event> CreateEvents(List<CreateEventRequest> eventRequests);
+    Task<List<Event>> CreateEventsAsync(
+        List<CreateEventRequest> eventRequests,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Обновить событие
     /// </summary>
-    /// <param name="id"></param>
-    /// <param name="title"></param>
-    /// <param name="description"></param>
-    /// <param name="startAt"></param>
-    /// <param name="endAt"></param>
-    
-    public Event UpdateEvent(Guid id, string title, string? description, DateTime startAt, DateTime endAt);
+    Task<Event> UpdateEventAsync(
+        Guid id,
+        string title,
+        string? description,
+        DateTime startAt,
+        DateTime endAt,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Удалить событие
     /// </summary>
-    /// <param name="id"></param>
-    /// <returns></returns>
-    public void DeleteEvent(Guid id);
+    Task DeleteEventAsync(Guid id, CancellationToken cancellationToken = default);
+
     /// <summary>
-    /// Найти событие по ид 
+    /// Найти событие по Id
     /// </summary>
-    /// <param name="id"></param>
-    /// <returns></returns>
-    public Event GetByIdEvent(Guid id);
+    Task<Event> GetByIdEventAsync(Guid id, CancellationToken cancellationToken = default);
+
     /// <summary>
-    /// Получить список всех событий
+    /// Получить список всех событий с фильтрацией и пагинацией
     /// </summary>
-    /// <returns></returns>
-    public PaginatedResult<Event> GetAllEvent(string? title = null , DateTime? from = null , DateTime? to = null, int page = 1, int pageSize = 10);
-    
+    Task<PaginatedResult<Event>> GetAllEventAsync(
+        string? title = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default);
 }
