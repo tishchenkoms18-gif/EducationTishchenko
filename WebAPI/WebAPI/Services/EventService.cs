@@ -1,4 +1,3 @@
-using WebAPI.Services;
 
 public class EventService : IEventService
 {

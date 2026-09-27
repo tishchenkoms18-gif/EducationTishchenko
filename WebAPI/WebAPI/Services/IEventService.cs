@@ -1,7 +1,4 @@
 
-
-namespace WebAPI.Services;
-
 /// <summary>
 /// Контракт сервиса для управления мероприятиями
 /// </summary>
