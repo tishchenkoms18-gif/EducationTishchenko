@@ -7,7 +7,6 @@ public class BookingBackgroundService : BackgroundService
     // 🔒 Семафор для защиты записи в хранилище (нельзя lock с await)
     private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
 
-    // Константы вместо «магических» чисел
     private const int PollingIntervalMs = 3000;
     private const int ProcessingDelayMs = 2000;
 
@@ -21,22 +20,25 @@ public class BookingBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("BookingBackgroundService запущен.");
+       _logger.LogInformation("BookingBackgroundService запущен");
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
-                var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+                List<Booking> pendingBookings;
 
-                // Получаем Pending-брони
-                var pendingBookings = await bookingService.GetBookingsByStatusAsync(BookingStatus.Pending);
+                // ✅ Создаём scope, чтобы получить сервис
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+                    pendingBookings = await bookingService.GetBookingsByStatusAsync(BookingStatus.Pending);
+                }
 
                 if (pendingBookings.Any())
                 {
-                    // ✅ Параллельная обработка всех Pending-броней
-                    var tasks = pendingBookings.Select(b => ProcessBookingAsync(b, scope, stoppingToken));
+                    // ✅ Каждая бронь — свой scope
+                    var tasks = pendingBookings.Select(b => ProcessBookingAsync(b, stoppingToken));
                     await Task.WhenAll(tasks);
                 }
 
@@ -44,7 +46,7 @@ public class BookingBackgroundService : BackgroundService
             }
             catch (OperationCanceledException)
             {
-                break; // корректное завершение при остановке приложения
+                break;
             }
             catch (Exception ex)
             {
@@ -59,13 +61,12 @@ public class BookingBackgroundService : BackgroundService
     /// <summary>
     /// Обработка одной брони: имитация внешнего вызова → подтверждение/отклонение
     /// </summary>
-    private async Task ProcessBookingAsync(Booking booking, IServiceScope scope, CancellationToken stoppingToken)
+    private async Task ProcessBookingAsync(Booking booking, CancellationToken stoppingToken)
     {
         try
         {
-            // ✅ Задержка ДО захвата семафора — все задержки выполняются параллельно
             await Task.Delay(ProcessingDelayMs, stoppingToken);
-
+            using var scope = _serviceProvider.CreateScope();
             var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
             var eventService = scope.ServiceProvider.GetRequiredService<IEventService>();
 
@@ -107,9 +108,9 @@ public class BookingBackgroundService : BackgroundService
         {
             _logger.LogError(ex, "Неожиданная ошибка при обработке брони {BookingId}", booking.Id);
 
-            // ✅ Пытаемся отклонить бронь и вернуть место
             try
             {
+                using var scope = _serviceProvider.CreateScope();
                 var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
                 await bookingService.RejectBookingAsync(booking.Id);
             }

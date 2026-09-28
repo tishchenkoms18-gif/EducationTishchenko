@@ -4,8 +4,6 @@ public class BookingService : IBookingService
     private readonly List<Booking> _bookings = new();
     private readonly ILogger<BookingService> _logger;
     private readonly IEventService _eventService;
-
-    // 🔒 Критическая секция: проверка мест + создание брони
     private readonly object _bookingLock = new();
 
     public BookingService(ILogger<BookingService> logger, IEventService eventService)
@@ -79,23 +77,32 @@ public class BookingService : IBookingService
         booking.Reject();
 
         // Возвращаем место в пул события
-        try
-        {
-            var eventEntity = await _eventService.GetByIdEventAsync(booking.EventId);
-            eventEntity.ReleaseSeats(1);
 
-            _logger.LogInformation(
-                "Возвращено место для события {EventId}. Доступно: {AvailableSeats}",
-                eventEntity.Id,
-                eventEntity.AvailableSeats);
-        }
-        catch (EventNotFoundException)
-        {
-            _logger.LogWarning(
-                "Не удалось вернуть место: событие {EventId} не найдено",
-                booking.EventId);
-        }
+            Event? eventEntity = null;
+            try
+            {
+                eventEntity = await _eventService.GetByIdEventAsync(booking.EventId);
+            }
+            catch (EventNotFoundException)
+            {
+                _logger.LogWarning(
+                    "Не удалось вернуть место: событие {EventId} не найдено",
+                    booking.EventId);
+            }
 
+            if (eventEntity != null)
+             {
+                lock (_bookingLock)
+                {
+                    eventEntity.ReleaseSeats(1);
+
+                    _logger.LogInformation(
+                        "Возвращено место для события {EventId}. Доступно: {AvailableSeats}",
+                        eventEntity.Id,
+                        eventEntity.AvailableSeats);
+                }
+            }
+        
         _logger.LogInformation(
             "Отклонено бронирование: {BookingId} для события {EventId}",
             booking.Id,
