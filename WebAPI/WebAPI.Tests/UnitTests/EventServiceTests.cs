@@ -341,4 +341,26 @@ public class EventServiceTests
 
         Assert.Equal("Дата начала должна быть раньше даты окончания", exception.Message);
     }
+
+    [Fact]
+public async Task ConcurrentReadsAndWrites_ShouldNotThrow()
+{
+    // Arrange
+    var writeTasks = Enumerable.Range(0, 50).Select(i =>
+        _eventService.CreateEventAsync(
+            $"Event {i}", null,
+            DateTime.UtcNow.AddDays(1),
+            DateTime.UtcNow.AddDays(2),
+            totalSeats: 10));
+
+    var readTasks = Enumerable.Range(0, 50).Select(_ =>
+        _eventService.GetAllEventAsync(null, null, null, 1, 100));
+
+    var allTasks = writeTasks.Cast<Task>().Concat(readTasks.Cast<Task>());
+    // Act & Assert — не должно быть исключения
+    await Task.WhenAll(allTasks);
+
+    var result = await _eventService.GetAllEventAsync(null, null, null, 1, 100);
+    Assert.Equal(50, result.TotalCount);
+}
 }
