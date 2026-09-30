@@ -7,4 +7,6 @@ public class EventResponse
     public DateTime StartAt { get; set; }
     public DateTime EndAt { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int TotalSeats { get; set; } 
+    public int AvailableSeats { get; set; }
 }

@@ -9,7 +9,14 @@ public class Event
     public DateTime StartAt { get; private set; }
     public DateTime EndAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
-
+    /// <summary>
+    /// общее количество мест на событии
+    /// </summary>
+    public int  TotalSeats {get; private set;} 
+    /// <summary>
+    ///  текущее количество свободных мест
+    /// </summary>
+    public int AvailableSeats {get; private set;} 
 
 // Для EF Core (без параметров)
     private Event() { }
@@ -21,7 +28,8 @@ public class Event
         string? description,
         DateTime startAt,
         DateTime endAt,
-        DateTime createdAt)
+        DateTime createdAt,
+        int totalSeats)
     {
         Id = id;
         Title = title;
@@ -29,10 +37,16 @@ public class Event
         StartAt = startAt;
         EndAt = endAt;
         CreatedAt = createdAt;
+        TotalSeats = totalSeats;
+        AvailableSeats = totalSeats;
     }
-     public static Event Create(string title, string? description, DateTime startAt, DateTime endAt)
+     public static Event Create(string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
         Validate(title, startAt, endAt);
+
+
+         if (totalSeats <= 0)
+            throw new ValidationException("общее количество мест на событии не может быть отрицательным или быть равным нулю");
 
         return new Event
         {
@@ -41,7 +55,9 @@ public class Event
             Description = description,
             StartAt = startAt.ToUniversalTime(),
             EndAt = endAt.ToUniversalTime(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            TotalSeats = totalSeats,
+            AvailableSeats = totalSeats
         };
     }
 
@@ -68,5 +84,20 @@ public class Event
 
         if (startAt < DateTime.UtcNow.AddHours(-1))
             throw new ArgumentException("Нельзя создавать событие в прошлом");
+    }
+
+    public bool TryReserveSeats(int count = 1)
+    {
+        if (count <= 0) throw new ArgumentException("Количество должно быть позитивным числом");
+        if (AvailableSeats < count) return false;
+        
+        AvailableSeats -= count;
+        return true;
+    }
+
+    public void ReleaseSeats(int count = 1)
+    {
+        if (count <= 0) throw new ArgumentException("Количество должно быть позитивным числом");
+        AvailableSeats = Math.Min(AvailableSeats + count, TotalSeats);
     }
 }

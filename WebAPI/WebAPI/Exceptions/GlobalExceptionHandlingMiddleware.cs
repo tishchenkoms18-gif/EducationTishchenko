@@ -62,6 +62,7 @@ public class GlobalExceptionHandlingMiddleware
              KeyNotFoundException => StatusCodes.Status404NotFound,
              BookingNotFoundException => StatusCodes.Status404NotFound, 
              EventNotFoundException => StatusCodes.Status404NotFound,
+             NoAvailableSeatsException => StatusCodes.Status409Conflict,
              _ => StatusCodes.Status500InternalServerError
         };
 }
