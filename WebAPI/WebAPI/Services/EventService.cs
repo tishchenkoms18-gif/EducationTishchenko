@@ -1,16 +1,19 @@
+using Microsoft.EntityFrameworkCore;
+using WebAPI.DataAccess;
+
 
 public class EventService : IEventService
 {
-    private readonly List<Event> _events = new();
+    private readonly AppDbContext _context;
     private readonly ILogger<EventService> _logger;
-    private readonly object _eventsLock = new(); // 🔒 для потокобезопасности
 
-    public EventService(ILogger<EventService> logger)
+    public EventService(AppDbContext context, ILogger<EventService> logger)
     {
+        _context = context;
         _logger = logger;
     }
 
-    public Task<Event> CreateEventAsync(
+    public async Task<Event> CreateEventAsync(
         string title,
         string? description,
         DateTime startAt,
@@ -20,21 +23,17 @@ public class EventService : IEventService
     {
         var eventEntity = Event.Create(title, description, startAt, endAt, totalSeats);
 
-        lock (_eventsLock)
-        {
-            _events.Add(eventEntity);
-        }
+        _context.Events.Add(eventEntity);
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
             "Создано событие: {Title} (ID: {Id}), мест: {TotalSeats}",
-            eventEntity.Title,
-            eventEntity.Id,
-            eventEntity.TotalSeats);
+            eventEntity.Title, eventEntity.Id, eventEntity.TotalSeats);
 
-        return Task.FromResult(eventEntity);
+        return eventEntity;
     }
 
-    public Task<List<Event>> CreateEventsAsync(
+    public async Task<List<Event>> CreateEventsAsync(
         List<CreateEventRequest> eventRequests,
         CancellationToken cancellationToken = default)
     {
@@ -55,16 +54,14 @@ public class EventService : IEventService
             createdEvents.Add(eventEntity);
         }
 
-        lock (_eventsLock)
-        {
-            _events.AddRange(createdEvents);
-        }
+        _context.Events.AddRange(createdEvents);
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Создано {Count} событий за один запрос", createdEvents.Count);
-        return Task.FromResult(createdEvents);
+        return createdEvents;
     }
 
-    public Task<Event> UpdateEventAsync(
+    public async Task<Event> UpdateEventAsync(
         Guid id,
         string title,
         string? description,
@@ -72,39 +69,41 @@ public class EventService : IEventService
         DateTime endAt,
         CancellationToken cancellationToken = default)
     {
-        var eventEntity = _events.FirstOrDefault(e => e.Id == id)
+        var eventEntity = await _context.Events
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken)
             ?? throw new EventNotFoundException(id);
 
         eventEntity.Update(title, description, startAt, endAt);
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Событие изменено: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
-        return Task.FromResult(eventEntity);
+        return eventEntity;
     }
 
-    public Task DeleteEventAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task DeleteEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        lock (_eventsLock)
-        {
-            var eventEntity = _events.FirstOrDefault(e => e.Id == id)
-                ?? throw new EventNotFoundException(id);
+        var eventEntity = await _context.Events
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken)
+            ?? throw new EventNotFoundException(id);
 
-            _events.Remove(eventEntity);
-            _logger.LogInformation("Удалено событие: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
-        }
+        _context.Events.Remove(eventEntity);
+        await _context.SaveChangesAsync(cancellationToken);
 
-        return Task.CompletedTask;
+        _logger.LogInformation("Удалено событие: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
     }
 
-    public Task<Event> GetByIdEventAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<Event> GetByIdEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var eventEntity = _events.FirstOrDefault(e => e.Id == id);
+        var eventEntity = await _context.Events
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+
         if (eventEntity == null)
             throw new EventNotFoundException(id);
 
-        return Task.FromResult(eventEntity);
+        return eventEntity;
     }
 
-    public Task<PaginatedResult<Event>> GetAllEventAsync(
+    public async Task<PaginatedResult<Event>> GetAllEventAsync(
         string? title = null,
         DateTime? from = null,
         DateTime? to = null,
@@ -118,10 +117,10 @@ public class EventService : IEventService
         if (pageSize < 1 || pageSize > 100)
             throw new ValidationException("PageSize must be between 1 and 100");
 
-        var query = _events.AsQueryable();
+        var query = _context.Events.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(title))
-            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+            query = query.Where(e => EF.Functions.ILike(e.Title, $"%{title}%"));
 
         if (from.HasValue)
             query = query.Where(e => e.StartAt >= from.Value.ToUniversalTime());
@@ -129,14 +128,15 @@ public class EventService : IEventService
         if (to.HasValue)
             query = query.Where(e => e.EndAt <= to.Value.ToUniversalTime());
 
-        var totalCount = query.Count();
-        var items = query
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
             .OrderByDescending(e => e.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync(cancellationToken);
 
-        var result = new PaginatedResult<Event>
+        return new PaginatedResult<Event>
         {
             TotalCount = totalCount,
             Items = items,
@@ -144,7 +144,5 @@ public class EventService : IEventService
             PageSize = pageSize,
             TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
         };
-
-        return Task.FromResult(result);
     }
 }
