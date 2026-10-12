@@ -57,3 +57,4 @@ TestResult.xml
 nunit-*.xml
 WebAPI/WebAPI/.DS_Store
 .DS_Store
+WebAPI/WebAPI.slnx
