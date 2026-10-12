@@ -13,7 +13,6 @@ public class EventServiceTests : IDisposable
 
     public EventServiceTests()
     {
-        // ✅ Уникальное имя БД в переменной (не в лямбде!)
         var dbName = Guid.NewGuid().ToString();
 
         var services = new ServiceCollection();

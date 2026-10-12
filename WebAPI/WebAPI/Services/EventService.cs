@@ -120,7 +120,11 @@ public class EventService : IEventService
         var query = _context.Events.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(title))
-            query = query.Where(e => EF.Functions.ILike(e.Title, $"%{title}%"));
+        {
+             var titleLower = title.ToLower();
+            query = query.Where(e => e.Title.ToLower().Contains(titleLower));
+        }
+           
 
         if (from.HasValue)
             query = query.Where(e => e.StartAt >= from.Value.ToUniversalTime());
