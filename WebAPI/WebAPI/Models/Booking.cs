@@ -7,6 +7,7 @@ public class Booking {
     public BookingStatus Status { get; private set; } //текущий статус брони;
     public DateTime CreatedAt { get; private set; } //дата и время создания брони;
     public DateTime? ProcessedAt { get; private set; } //дата и время обработки брони.
+    public Event Event { get; set; } = null!; // Навигационное свойство: у брони одно событие
 
     // Для EF Core (без параметров)
     private Booking(){}

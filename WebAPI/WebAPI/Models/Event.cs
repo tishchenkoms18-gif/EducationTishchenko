@@ -17,8 +17,9 @@ public class Event
     ///  текущее количество свободных мест
     /// </summary>
     public int AvailableSeats {get; private set;} 
+    public ICollection<Booking> Bookings {get;set;} = new List<Booking>(); //Навигационное свойство: у события много броней
 
-// Для EF Core (без параметров)
+    // Для EF Core (без параметров)
     private Event() { }
 
     // Приватный конструктор с параметрами

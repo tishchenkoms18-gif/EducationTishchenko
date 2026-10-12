@@ -1,15 +1,19 @@
+// Services/BookingService.cs
+using Microsoft.EntityFrameworkCore;
+using WebAPI.DataAccess;
 
 public class BookingService : IBookingService
 {
-    private readonly List<Booking> _bookings = new();
+    private readonly AppDbContext _context;
     private readonly ILogger<BookingService> _logger;
-    private readonly IEventService _eventService;
-    private readonly object _bookingLock = new();
 
-    public BookingService(ILogger<BookingService> logger, IEventService eventService)
+    // ✅ static SemaphoreSlim — для синхронизации между экземплярами
+    private static readonly SemaphoreSlim _bookingSemaphore = new(1, 1);
+
+    public BookingService(AppDbContext context, ILogger<BookingService> logger)
     {
+        _context = context;
         _logger = logger;
-        _eventService = eventService;
     }
 
     public async Task<Booking> CreateBookingAsync(Guid eventId)
@@ -17,58 +21,62 @@ public class BookingService : IBookingService
         if (eventId == Guid.Empty)
             throw new ArgumentException("EventId не может быть пустым", nameof(eventId));
 
-        // ⚡ Асинхронно получаем событие (вне lock)
-        var eventEntity = await _eventService.GetByIdEventAsync(eventId);
-
-        // 🔒 Критическая секция
-        lock (_bookingLock)
+        await _bookingSemaphore.WaitAsync();   // 🔒 Захватываем асинхронно
+        try
         {
-            // Атомарная пара: проверка + резервирование
+            var eventEntity = await _context.Events
+                .FirstOrDefaultAsync(e => e.Id == eventId)
+                ?? throw new EventNotFoundException(eventId);
+
             if (!eventEntity.TryReserveSeats(1))
                 throw new NoAvailableSeatsException(eventId);
 
-            var bookingEntity = Booking.Create(eventId);
-            _bookings.Add(bookingEntity);
+            var booking = Booking.Create(eventId);
+            _context.Bookings.Add(booking);
+
+            // ✅ Один SaveChangesAsync сохраняет и бронь, и уменьшение AvailableSeats
+            await _context.SaveChangesAsync();
 
             _logger.LogInformation(
-                "Создано бронирование: {BookingId} для события {EventId}. Осталось мест: {AvailableSeats}",
-                bookingEntity.Id,
-                bookingEntity.EventId,
-                eventEntity.AvailableSeats);
+                "Создана бронь {BookingId} для события {EventId}. Осталось мест: {AvailableSeats}",
+                booking.Id, eventId, eventEntity.AvailableSeats);
 
-            return bookingEntity;
+            return booking;
+        }
+        finally
+        {
+            _bookingSemaphore.Release();       // 🔓 Отпускаем в любом случае
         }
     }
 
     public async Task<Booking> GetBookingByIdAsync(Guid id)
     {
-        var bookingEntity = _bookings.FirstOrDefault(b => b.Id == id);
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(b => b.Id == id);
 
-        if (bookingEntity == null)
+        if (booking == null)
             throw new BookingNotFoundException(id);
 
-        return await Task.FromResult(bookingEntity);
+        return booking;
     }
 
     public async Task<List<Booking>> GetBookingsByEventIdAsync(Guid eventId)
     {
-        var bookings = _bookings
+        return await _context.Bookings
             .Where(b => b.EventId == eventId)
             .OrderByDescending(b => b.CreatedAt)
-            .ToList();
-
-        return await Task.FromResult(bookings);
+            .ToListAsync();
     }
 
     public async Task ConfirmBookingAsync(Guid id)
     {
         var booking = await GetBookingByIdAsync(id);
         booking.Confirm();
+        await _context.SaveChangesAsync();
 
         _logger.LogInformation(
             "Подтверждено бронирование: {BookingId} для события {EventId}",
-            booking.Id,
-            booking.EventId);
+            booking.Id, booking.EventId);
     }
 
     public async Task RejectBookingAsync(Guid id)
@@ -76,55 +84,39 @@ public class BookingService : IBookingService
         var booking = await GetBookingByIdAsync(id);
         booking.Reject();
 
-        // Возвращаем место в пул события
+        // ✅ Возвращаем место в пул события
+        var eventEntity = await _context.Events
+            .FirstOrDefaultAsync(e => e.Id == booking.EventId);
 
-            Event? eventEntity = null;
-            try
-            {
-                eventEntity = await _eventService.GetByIdEventAsync(booking.EventId);
-            }
-            catch (EventNotFoundException)
-            {
-                _logger.LogWarning(
-                    "Не удалось вернуть место: событие {EventId} не найдено",
-                    booking.EventId);
-            }
+        if (eventEntity != null)
+        {
+            eventEntity.ReleaseSeats(1);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Не удалось вернуть место: событие {EventId} не найдено", booking.EventId);
+        }
 
-            if (eventEntity != null)
-             {
-                lock (_bookingLock)
-                {
-                    eventEntity.ReleaseSeats(1);
+        await _context.SaveChangesAsync();
 
-                    _logger.LogInformation(
-                        "Возвращено место для события {EventId}. Доступно: {AvailableSeats}",
-                        eventEntity.Id,
-                        eventEntity.AvailableSeats);
-                }
-            }
-        
         _logger.LogInformation(
             "Отклонено бронирование: {BookingId} для события {EventId}",
-            booking.Id,
-            booking.EventId);
+            booking.Id, booking.EventId);
     }
 
     public async Task<List<Booking>> GetAllBookingsAsync()
     {
-        var bookings = _bookings
+        return await _context.Bookings
             .OrderByDescending(b => b.CreatedAt)
-            .ToList();
-
-        return await Task.FromResult(bookings);
+            .ToListAsync();
     }
 
     public async Task<List<Booking>> GetBookingsByStatusAsync(BookingStatus status)
     {
-        var bookings = _bookings
+        return await _context.Bookings
             .Where(b => b.Status == status)
             .OrderByDescending(b => b.CreatedAt)
-            .ToList();
-
-        return await Task.FromResult(bookings);
+            .ToListAsync();
     }
 }
