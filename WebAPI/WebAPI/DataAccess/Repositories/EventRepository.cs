@@ -66,12 +66,6 @@ public class EventRepository : IEventRepository
             _db.Events.Remove(eventEntity);
         }
     }
-
-    public async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        return await _db.Events.AsNoTracking().AnyAsync(e => e.Id == id, cancellationToken);
-    }
-
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _db.SaveChangesAsync(cancellationToken);

@@ -23,8 +23,6 @@ public interface IEventRepository
 
     public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 
-    public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
-
     public Task SaveChangesAsync(CancellationToken cancellationToken = default);
     public Task AddRangeAsync(IEnumerable<Event> eventEntities, CancellationToken cancellationToken = default);
 }

@@ -35,6 +35,7 @@ public class EventRepositoryTests : BaseRepositoryTest
         await _repository.AddAsync(eventEntity);
         await _repository.SaveChangesAsync();
 
+        DbContext.ChangeTracker.Clear();
         // Assert
         var saved = await DbContext.Events.FindAsync(eventEntity.Id);
         Assert.NotNull(saved);
@@ -74,7 +75,8 @@ public class EventRepositoryTests : BaseRepositoryTest
         var eventEntity = CreateSampleEvent();
         await _repository.AddAsync(eventEntity);
         await _repository.SaveChangesAsync();
-
+        
+        DbContext.ChangeTracker.Clear();
         // Act
         eventEntity.Update("Updated Title", "New Desc", DateTime.UtcNow.AddDays(5), DateTime.UtcNow.AddDays(6));
         await _repository.UpdateAsync(eventEntity);
@@ -103,30 +105,7 @@ public class EventRepositoryTests : BaseRepositoryTest
         Assert.Null(deleted);
     }
 
-    [Fact]
-    public async Task ExistsAsync_ShouldReturnTrue_WhenExists()
-    {
-        // Arrange
-        var eventEntity = CreateSampleEvent();
-        await _repository.AddAsync(eventEntity);
-        await _repository.SaveChangesAsync();
-
-        // Act
-        var exists = await _repository.ExistsAsync(eventEntity.Id);
-
-        // Assert
-        Assert.True(exists);
-    }
-
-    [Fact]
-    public async Task ExistsAsync_ShouldReturnFalse_WhenNotExists()
-    {
-        // Act
-        var exists = await _repository.ExistsAsync(Guid.NewGuid());
-
-        // Assert
-        Assert.False(exists);
-    }
+   
 
     // =============================================
     // ТЕСТЫ ФИЛЬТРАЦИИ И ПАГИНАЦИИ (GetAllAsync / CountAsync)
@@ -219,5 +198,100 @@ public class EventRepositoryTests : BaseRepositoryTest
         // Assert
         Assert.Single(result);
         Assert.Equal("C# Conference", result[0].Title);
+    }
+
+        [Fact]
+    public async Task AddRangeAsync_ShouldSaveMultipleEvents()
+    {
+        // Arrange
+        var events = new List<Event>
+        {
+            CreateSampleEvent("Event 1"),
+            CreateSampleEvent("Event 2")
+        };
+
+        // Act
+        await _repository.AddRangeAsync(events);
+        await _repository.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
+
+        // Assert
+        var count = await DbContext.Events.CountAsync();
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ShouldFilterByFromOnly()
+    {
+        // Arrange
+        var baseDate = DateTime.UtcNow.Date;
+        await _repository.AddAsync(Event.Create("E1", null, baseDate.AddDays(1), baseDate.AddDays(2), 10));
+        await _repository.AddAsync(Event.Create("E2", null, baseDate.AddDays(10), baseDate.AddDays(11), 10));
+        await _repository.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await _repository.GetAllAsync(from: baseDate.AddDays(5));
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("E2", result[0].Title);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ShouldFilterByToOnly()
+    {
+        // Arrange
+        var baseDate = DateTime.UtcNow.Date;
+        await _repository.AddAsync(Event.Create("E1", null, baseDate.AddDays(1), baseDate.AddDays(2), 10));
+        await _repository.AddAsync(Event.Create("E2", null, baseDate.AddDays(10), baseDate.AddDays(11), 10));
+        await _repository.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await _repository.GetAllAsync(to: baseDate.AddDays(5));
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("E1", result[0].Title);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ShouldBeCaseInsensitive_WhenFilteringByTitle()
+    {
+        // Arrange
+        await _repository.AddAsync(CreateSampleEvent("C# Workshop"));
+        await _repository.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await _repository.GetAllAsync(title: "c#"); // Маленькими буквами
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("C# Workshop", result[0].Title);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ShouldOrderByCreatedAtDescending()
+    {
+        // Arrange
+        var e1 = CreateSampleEvent("First");
+        await _repository.AddAsync(e1);
+        await _repository.SaveChangesAsync();
+        
+        await Task.Delay(10); // Небольшая задержка, чтобы CreatedAt отличался
+        
+        var e2 = CreateSampleEvent("Second");
+        await _repository.AddAsync(e2);
+        await _repository.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await _repository.GetAllAsync();
+
+        // Assert
+        Assert.Equal("Second", result[0].Title); // Сначала новые
+        Assert.Equal("First", result[1].Title);
     }
 }

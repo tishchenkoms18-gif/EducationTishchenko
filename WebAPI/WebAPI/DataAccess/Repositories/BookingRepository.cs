@@ -26,12 +26,6 @@ public class BookingRepository : IBookingRepository
          _db.Bookings.Update(bookingEntity);
         return Task.CompletedTask;
     }
-    public async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        return await _db.Bookings
-            .AsNoTracking()
-            .AnyAsync(b => b.Id == id, cancellationToken);
-    }
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
          return _db.SaveChangesAsync(cancellationToken);

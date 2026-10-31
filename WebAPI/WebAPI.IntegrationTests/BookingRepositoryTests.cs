@@ -37,10 +37,12 @@ public class BookingRepositoryTests : BaseRepositoryTest
         var eventEntity = await CreateEventAsync();
         var booking = Booking.Create(eventEntity.Id);
 
+ 
         // Act
         await _bookingRepository.AddAsync(booking);
         await _bookingRepository.SaveChangesAsync();
-
+        
+        DbContext.ChangeTracker.Clear();
         // Assert
         var saved = await DbContext.Bookings.FindAsync(booking.Id);
         Assert.NotNull(saved);
@@ -79,6 +81,7 @@ public class BookingRepositoryTests : BaseRepositoryTest
         await _bookingRepository.UpdateAsync(booking);
         await _bookingRepository.SaveChangesAsync();
 
+        DbContext.ChangeTracker.Clear();
         // Assert
         var updated = await _bookingRepository.GetByIdAsync(booking.Id);
         Assert.NotNull(updated);
