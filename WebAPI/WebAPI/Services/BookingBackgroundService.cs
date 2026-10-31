@@ -1,3 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
+using WebAPI.DataAccess.Repositories;
+
 
 public class BookingBackgroundService : BackgroundService
 {
@@ -23,28 +26,23 @@ public class BookingBackgroundService : BackgroundService
         {
             try
             {
-                // 1. Получаем список Pending ID в отдельном scope
                 List<Guid> pendingBookingIds;
 
+                // 1. Получаем список Pending ID в отдельном scope
                 using (var scope = _scopeFactory.CreateScope())
                 {
-                    var bookingService = scope.ServiceProvider
-                        .GetRequiredService<IBookingService>();
-
-                    var pendingBookings = await bookingService
-                        .GetBookingsByStatusAsync(BookingStatus.Pending);
-
-                    pendingBookingIds = pendingBookings
-                        .Select(b => b.Id)
-                        .ToList();
+                    var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+                    
+                    var pendingBookings = await bookingRepository.GetByStatusAsync(BookingStatus.Pending);
+                    
+                    // Передаём только ID, чтобы не тащить сущности между разными DbContext
+                    pendingBookingIds = pendingBookings.Select(b => b.Id).ToList();
                 }
 
-                // 2. Обрабатываем каждую бронь параллельно — свой scope на каждую
+                // 2. Обрабатываем каждую бронь параллельно, создавая свой scope
                 if (pendingBookingIds.Any())
                 {
-                    var tasks = pendingBookingIds.Select(id =>
-                        ProcessBookingAsync(id, stoppingToken));
-
+                    var tasks = pendingBookingIds.Select(id => ProcessBookingAsync(id, stoppingToken));
                     await Task.WhenAll(tasks);
                 }
 
@@ -71,29 +69,31 @@ public class BookingBackgroundService : BackgroundService
     {
         try
         {
-            // Имитация внешнего вызова (до открытия scope, чтобы задержки шли параллельно)
+            // Имитация внешнего вызова
             await Task.Delay(ProcessingDelayMs, stoppingToken);
 
-            // ✅ Свой scope на каждую бронь
+            //  Свой scope на каждую бронь
             using var scope = _scopeFactory.CreateScope();
-            var bookingService = scope.ServiceProvider
-                .GetRequiredService<IBookingService>();
-            var eventService = scope.ServiceProvider
-                .GetRequiredService<IEventService>();
+            var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+            var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
 
-            // Загружаем бронь в текущем scope
-            var booking = await bookingService.GetBookingByIdAsync(bookingId);
-
-            // Проверяем, существует ли ещё событие
-            try
+            var booking = await bookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
             {
-                await eventService.GetByIdEventAsync(booking.EventId);
+                _logger.LogWarning("Бронь {BookingId} не найдена при обработке", bookingId);
+                return;
             }
-            catch (EventNotFoundException)
-            {
-                // Событие удалено → отклоняем бронь (RejectBookingAsync вернёт место, если найдёт)
-                await bookingService.RejectBookingAsync(booking.Id);
 
+            // Проверяем, существует ли событие
+            var eventEntity = await eventRepository.GetByIdAsync(booking.EventId);
+
+            if (eventEntity == null)
+            {
+                // Событие удалено → отклоняем бронь
+                booking.Reject();
+                await bookingRepository.UpdateAsync(booking);
+                await bookingRepository.SaveChangesAsync();
+                
                 _logger.LogWarning(
                     "Бронь {BookingId} отклонена: событие {EventId} не найдено",
                     booking.Id, booking.EventId);
@@ -101,7 +101,9 @@ public class BookingBackgroundService : BackgroundService
             }
 
             // Всё ок → подтверждаем
-            await bookingService.ConfirmBookingAsync(booking.Id);
+            booking.Confirm();
+            await bookingRepository.UpdateAsync(booking);
+            await bookingRepository.SaveChangesAsync();
 
             _logger.LogInformation(
                 "Бронь {BookingId} подтверждена для события {EventId}",
@@ -111,29 +113,36 @@ public class BookingBackgroundService : BackgroundService
         {
             _logger.LogInformation("Обработка брони {BookingId} отменена", bookingId);
         }
-        catch (BookingNotFoundException ex)
-        {
-            _logger.LogWarning(
-                "Бронь {BookingId} не найдена при обработке: {Message}",
-                bookingId, ex.Message);
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка обработки брони {BookingId}", bookingId);
+            _logger.LogError(ex, "Неожиданная ошибка при обработке брони {BookingId}", bookingId);
 
-            // Пытаемся отклонить бронь в новом scope (старый мог быть повреждён)
+            //  Пытаемся отклонить бронь и вернуть место при непредвиденной ошибке
             try
             {
                 using var scope = _scopeFactory.CreateScope();
-                var bookingService = scope.ServiceProvider
-                    .GetRequiredService<IBookingService>();
+                var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+                var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
 
-                await bookingService.RejectBookingAsync(bookingId);
+                var booking = await bookingRepository.GetByIdAsync(bookingId);
+                if (booking != null && booking.Status == BookingStatus.Pending)
+                {
+                    booking.Reject();
+                    
+                    var eventEntity = await eventRepository.GetByIdAsync(booking.EventId);
+                    if (eventEntity != null)
+                    {
+                        eventEntity.ReleaseSeats(1);
+                        await eventRepository.UpdateAsync(eventEntity);
+                    }
+
+                    await bookingRepository.UpdateAsync(booking);
+                    await bookingRepository.SaveChangesAsync();
+                }
             }
             catch (Exception innerEx)
             {
-                _logger.LogError(innerEx,
-                    "Ошибка при отклонении брони {BookingId}", bookingId);
+                _logger.LogError(innerEx, "Ошибка при отклонении брони {BookingId}", bookingId);
             }
         }
     }
