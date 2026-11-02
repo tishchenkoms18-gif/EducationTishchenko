@@ -1,15 +1,13 @@
 using Microsoft.EntityFrameworkCore;
-using WebAPI.DataAccess;
-
 
 public class EventService : IEventService
 {
-    private readonly AppDbContext _context;
+    private readonly IEventRepository _eventRepository;
     private readonly ILogger<EventService> _logger;
 
-    public EventService(AppDbContext context, ILogger<EventService> logger)
+    public EventService(IEventRepository eventRepository, ILogger<EventService> logger)
     {
-        _context = context;
+        _eventRepository = eventRepository;
         _logger = logger;
     }
 
@@ -23,8 +21,8 @@ public class EventService : IEventService
     {
         var eventEntity = Event.Create(title, description, startAt, endAt, totalSeats);
 
-        _context.Events.Add(eventEntity);
-        await _context.SaveChangesAsync(cancellationToken);
+        await _eventRepository.AddAsync(eventEntity, cancellationToken);
+        await _eventRepository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
             "Создано событие: {Title} (ID: {Id}), мест: {TotalSeats}",
@@ -54,8 +52,8 @@ public class EventService : IEventService
             createdEvents.Add(eventEntity);
         }
 
-        _context.Events.AddRange(createdEvents);
-        await _context.SaveChangesAsync(cancellationToken);
+        await _eventRepository.AddRangeAsync(createdEvents, cancellationToken);
+        await _eventRepository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Создано {Count} событий за один запрос", createdEvents.Count);
         return createdEvents;
@@ -69,12 +67,13 @@ public class EventService : IEventService
         DateTime endAt,
         CancellationToken cancellationToken = default)
     {
-        var eventEntity = await _context.Events
-            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken)
+        var eventEntity = await _eventRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new EventNotFoundException(id);
 
         eventEntity.Update(title, description, startAt, endAt);
-        await _context.SaveChangesAsync(cancellationToken);
+        
+        await _eventRepository.UpdateAsync(eventEntity, cancellationToken);
+        await _eventRepository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Событие изменено: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
         return eventEntity;
@@ -82,20 +81,18 @@ public class EventService : IEventService
 
     public async Task DeleteEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var eventEntity = await _context.Events
-            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken)
+        var eventEntity = await _eventRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new EventNotFoundException(id);
 
-        _context.Events.Remove(eventEntity);
-        await _context.SaveChangesAsync(cancellationToken);
+        await _eventRepository.DeleteAsync(id, cancellationToken);
+        await _eventRepository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Удалено событие: {Title} (ID: {Id})", eventEntity.Title, eventEntity.Id);
     }
 
     public async Task<Event> GetByIdEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var eventEntity = await _context.Events
-            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var eventEntity = await _eventRepository.GetByIdAsync(id, cancellationToken);
 
         if (eventEntity == null)
             throw new EventNotFoundException(id);
@@ -117,28 +114,9 @@ public class EventService : IEventService
         if (pageSize < 1 || pageSize > 100)
             throw new ValidationException("PageSize must be between 1 and 100");
 
-        var query = _context.Events.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-             var titleLower = title.ToLower();
-            query = query.Where(e => e.Title.ToLower().Contains(titleLower));
-        }
-           
-
-        if (from.HasValue)
-            query = query.Where(e => e.StartAt >= from.Value.ToUniversalTime());
-
-        if (to.HasValue)
-            query = query.Where(e => e.EndAt <= to.Value.ToUniversalTime());
-
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        var items = await query
-            .OrderByDescending(e => e.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
+        var totalCount = await _eventRepository.CountAsync(title, from, to, cancellationToken);
+        
+        var items = await _eventRepository.GetAllAsync(title, from, to, page, pageSize, cancellationToken);
 
         return new PaginatedResult<Event>
         {

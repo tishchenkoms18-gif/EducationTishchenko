@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using WebAPI.DataAccess;
+using WebAPI.DataAccess.Repositories;
 using Xunit;
 
 namespace WebAPI.Tests.UnitTests.Services;
@@ -19,7 +19,8 @@ public class EventServiceTests : IDisposable
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase(dbName));
-
+        
+        services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IEventService, EventService>();
         services.AddLogging();
 

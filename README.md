@@ -10,6 +10,8 @@ REST API для управления мероприятиями с систем�
 - Swagger / Swashbuckle
 - In-Memory хранилище (`List<Event>`, `List<Booking>`)
 - xUnit + Moq (юнит-тесты)
+- EF Core Migrations
+- Testcontainers
 - Потокобезопасность: `lock`, `SemaphoreSlim`
 
 ---
@@ -73,22 +75,12 @@ REST API для управления мероприятиями с систем�
 
 ## 🔒 Синхронизация и потокобезопасность
 
-В спринте 4 добавлена защита от **овербукинга** при конкурентных запросах.
+Для защиты от **овербукинга** при конкурентных запросах используются следующие примитивы:
 
 | Примитив | Где используется | Зачем |
 |----------|------------------|-------|
-| **`lock`** | `BookingService.CreateBookingAsync` | Защищает атомарную пару «проверка доступных мест + создание брони». В один момент времени критическую секцию проходит только один поток. |
-| **`SemaphoreSlim`** | `BookingBackgroundService.ProcessBookingAsync` | Асинхронный аналог `Mutex`. Используется вместо `lock`, потому что `lock` нельзя применять с `await` внутри блока. Защищает запись в хранилище. |
+| **`static SemaphoreSlim`** | `BookingService.CreateBookingAsync` | Защищает атомарную пару «проверка доступных мест + создание брони». Асинхронный аналог `lock` (позволяет использовать `await` внутри критической секции). |
 | **`Task.WhenAll`** | `BookingBackgroundService.ExecuteAsync` | Обеспечивает параллельную обработку всех Pending-броней. |
-
-### Почему `lock`, а не `Interlocked`?
-
-`Interlocked` защищает **только одну переменную**. Критическая секция в `CreateBookingAsync` включает:
-1. Получение события из хранилища.
-2. Проверку и резервирование мест (`TryReserveSeats`).
-3. Создание и сохранение брони.
-
-Все эти операции должны быть атомарными **вместе**, поэтому используется `lock`.
 
 ---
 
@@ -113,3 +105,114 @@ REST API для управления мероприятиями с систем�
        "endAt": "2026-08-15T18:00:00Z",
        "totalSeats": 3
    }
+   ```
+##🧪 Запуск тестов
+Проект содержит юнит-тесты и интеграционные тесты.
+
+###Юнит-тесты
+Используют EF Core InMemory-провайдер. Docker не требуется.
+
+bash
+dotnet test WebAPI.Tests/WebAPI.Tests.csproj
+
+###Интеграционные тесты
+Используют Testcontainers для запуска реального контейнера PostgreSQL.
+Важно: Для запуска интеграционных тестов обязательно должен быть запущен Docker (Docker Desktop).
+bash
+dotnet test WebAPI.IntegrationTests/WebAPI.IntegrationTests.csproj
+Все тесты сразу
+Если Docker запущен, можно запустить всё одной командой из корня (где лежит .sln):
+
+bash
+dotnet test
+
+## 🗄️ Управление схемой базы данных (Миграции)
+
+Схема базы данных управляется через **EF Core Migrations**. При старте приложения автоматически применяются все непримененные миграции (используется `db.Database.Migrate()` в `Program.cs`).
+
+### Создание новой миграции
+Если вы изменили модели (`Event`, `Booking`), создайте новую миграцию:
+```bash
+dotnet ef migrations add <НазваниеМиграции> --project WebAPI
+```
+### Применение миграций
+ dotnet ef database update --project WebAPI
+
+###  Откат миграций
+dotnet ef database update <ИмяМиграции> --project WebAPI
+
+## 📁 Структура проекта
+📁 WebAPI/
+├── 📁 Controllers/
+├── 📁 Models/
+├── 📁 Services/
+├── 📁 DataAccess/
+│   ├── AppDbContext.cs
+│   ├── 📁 Configurations/       # Fluent API (EventConfiguration, BookingConfiguration)
+│   └── 📁 Repositories/         # IEventRepository, IBookingRepository и их реализации
+├── 📁 Migrations/               # EF Core миграции
+├── Program.cs
+└── WebAPI.csproj
+
+📁 WebAPI.Tests/                 # Юнит-тесты (InMemory)
+📁 WebAPI.IntegrationTests/      # Интеграционные тесты (Testcontainers + PostgreSQL)
+
+##📝 Примеры запросов
+###1. Создание события (POST)
+Запрос:
+
+http
+POST https://localhost:5001/api/events
+Content-Type: application/json
+
+{
+    "title": "Конференция .NET",
+    "description": "Ежегодная конференция",
+    "startAt": "2026-08-15T10:00:00Z",
+    "endAt": "2026-08-15T18:00:00Z",
+    "totalSeats": 100
+}
+Ответ (201 Created):
+
+json
+{
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "title": "Конференция .NET",
+    "description": "Ежегодная конференция",
+    "startAt": "2026-08-15T10:00:00Z",
+    "endAt": "2026-08-15T18:00:00Z",
+    "createdAt": "2026-07-27T12:00:00Z",
+    "totalSeats": 100,
+    "availableSeats": 100
+}
+###2. Бронирование события (POST)
+Запрос:
+
+http
+POST https://localhost:5001/api/events/3fa85f64-5717-4562-b3fc-2c963f66afa6/book
+Ответ (202 Accepted):
+Заголовок: Location: /api/bookings/5b2c4d6e-1234-5678-90ab-cdef01234567
+
+json
+{
+    "id": "5b2c4d6e-1234-5678-90ab-cdef01234567",
+    "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "status": "Pending",
+    "createdAt": "2026-07-27T12:05:00Z",
+    "processedAt": null
+}
+###3. Получение статуса брони (GET)
+Запрос:
+
+http
+GET https://localhost:5001/api/bookings/5b2c4d6e-1234-5678-90ab-cdef01234567
+Ответ (200 OK):
+
+json
+{
+    "id": "5b2c4d6e-1234-5678-90ab-cdef01234567",
+    "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "status": "Confirmed",
+    "createdAt": "2026-07-27T12:05:00Z",
+    "processedAt": "2026-07-27T12:05:02Z"
+}
