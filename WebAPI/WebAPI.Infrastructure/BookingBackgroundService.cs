@@ -70,45 +70,14 @@ public class BookingBackgroundService : BackgroundService
     {
         try
         {
-            // Имитация внешнего вызова
+           
             await Task.Delay(ProcessingDelayMs, stoppingToken);
 
-            //  Свой scope на каждую бронь
             using var scope = _scopeFactory.CreateScope();
-            var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
-            var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+            
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
-            var booking = await bookingRepository.GetByIdAsync(bookingId);
-            if (booking == null)
-            {
-                _logger.LogWarning("Бронь {BookingId} не найдена при обработке", bookingId);
-                return;
-            }
-
-            // Проверяем, существует ли событие
-            var eventEntity = await eventRepository.GetByIdAsync(booking.EventId);
-
-            if (eventEntity == null)
-            {
-                // Событие удалено → отклоняем бронь
-                booking.Reject();
-                await bookingRepository.UpdateAsync(booking);
-                await bookingRepository.SaveChangesAsync();
-                
-                _logger.LogWarning(
-                    "Бронь {BookingId} отклонена: событие {EventId} не найдено",
-                    booking.Id, booking.EventId);
-                return;
-            }
-
-            // Всё ок → подтверждаем
-            booking.Confirm();
-            await bookingRepository.UpdateAsync(booking);
-            await bookingRepository.SaveChangesAsync();
-
-            _logger.LogInformation(
-                "Бронь {BookingId} подтверждена для события {EventId}",
-                booking.Id, booking.EventId);
+            await bookingService.ProcessBookingAsync(bookingId, stoppingToken);
         }
         catch (OperationCanceledException)
         {
@@ -117,34 +86,6 @@ public class BookingBackgroundService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Неожиданная ошибка при обработке брони {BookingId}", bookingId);
-
-            //  Пытаемся отклонить бронь и вернуть место при непредвиденной ошибке
-            try
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
-                var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
-
-                var booking = await bookingRepository.GetByIdAsync(bookingId);
-                if (booking != null && booking.Status == BookingStatus.Pending)
-                {
-                    booking.Reject();
-                    
-                    var eventEntity = await eventRepository.GetByIdAsync(booking.EventId);
-                    if (eventEntity != null)
-                    {
-                        eventEntity.ReleaseSeats(1);
-                        await eventRepository.UpdateAsync(eventEntity);
-                    }
-
-                    await bookingRepository.UpdateAsync(booking);
-                    await bookingRepository.SaveChangesAsync();
-                }
-            }
-            catch (Exception innerEx)
-            {
-                _logger.LogError(innerEx, "Ошибка при отклонении брони {BookingId}", bookingId);
-            }
         }
     }
 }

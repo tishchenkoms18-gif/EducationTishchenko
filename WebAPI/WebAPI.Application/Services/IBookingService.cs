@@ -36,4 +36,20 @@ public interface IBookingService
     /// Получить бронирования по статусу
     /// </summary>
     Task<List<Booking>> GetBookingsByStatusAsync(BookingStatus status);
+   
+  /// <summary>
+/// Обрабатывает бронирование, находящееся в статусе <see cref="BookingStatus.Pending"/>.
+/// </summary>
+/// <remarks>
+/// Метод используется фоновым сервисом для асинхронной обработки заявок.
+/// Логика:
+/// <list type="number">
+///   <item>Если бронь не найдена или уже обработана — ничего не делает.</item>
+///   <item>Если связанное событие удалено — переводит бронь в статус <see cref="BookingStatus.Rejected"/> и возвращает место.</item>
+///   <item>Если событие существует — переводит бронь в статус <see cref="BookingStatus.Confirmed"/>.</item>
+/// </list>
+/// </remarks>
+/// <param name="bookingId">Идентификатор брони, которую нужно обработать.</param>
+/// <param name="cancellationToken">Токен отмены операции.</param>
+    Task ProcessBookingAsync(Guid bookingId, CancellationToken cancellationToken = default);
 }

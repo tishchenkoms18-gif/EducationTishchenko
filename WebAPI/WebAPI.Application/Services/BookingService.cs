@@ -19,6 +19,33 @@ public class BookingService : IBookingService
         _logger = logger;
     }
 
+    public async Task ProcessBookingAsync(Guid bookingId, CancellationToken cancellationToken = default)
+    {
+        var booking = await _bookingRepository.GetByIdAsync(bookingId, cancellationToken);
+        if (booking == null)
+        {
+            _logger.LogWarning("Бронь {BookingId} не найдена при обработке", bookingId);
+            return;
+        }
+
+        if (booking.Status != BookingStatus.Pending)
+            return;
+
+        var eventEntity = await _eventRepository.GetByIdAsync(booking.EventId, cancellationToken);
+
+        if (eventEntity == null)
+        {
+            // Событие удалено → отклоняем бронь 
+            await RejectBookingAsync(bookingId);
+            _logger.LogWarning("Бронь {BookingId} отклонена: событие {EventId} не найдено",
+                booking.Id, booking.EventId);
+            return;
+        }
+
+        // Всё ок → подтверждаем
+        await ConfirmBookingAsync(bookingId);
+        _logger.LogInformation("Бронь {BookingId} подтверждена", booking.Id);
+    }
     public async Task<Booking> CreateBookingAsync(Guid eventId)
     {
         if (eventId == Guid.Empty)
