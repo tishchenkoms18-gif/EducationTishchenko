@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace WebAPI.DataAccess.Repositories;
+namespace WebAPI.Infrastructure.DataAccess.Repositories;
 
 public class EventRepository : IEventRepository
 {

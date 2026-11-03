@@ -22,6 +22,8 @@ public class EventsController : ControllerBase
     /// <param name="title">Поиск по названию (частичное совпадение, регистронезависимый)</param>
     /// <param name="from">События, начинающиеся не раньше указанной даты</param>
     /// <param name="to">События, заканчивающиеся не позже указанной даты</param>
+    /// /// <param name="page">Страница, которую необходимо вернуть (по умолчанию 1)</param>
+    /// <param name="pageSize">Количество элементов на странице (по умолчанию 10, макс. 100)</param>
     /// </summary>
     // GET: api/events
     [HttpGet]

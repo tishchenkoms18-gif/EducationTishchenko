@@ -1,43 +1,52 @@
 using System.Reflection;
-using Microsoft.EntityFrameworkCore;
-using WebAPI.DataAccess.Repositories;
+using Microsoft.EntityFrameworkCore;    
+using WebAPI.Infrastructure.DependencyInjection;   
+using WebAPI.Infrastructure.DataAccess;  
+using WebAPI.DependencyInjection;                                
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+// =============================================
+// 1. Регистрация сервисов (Composition Root)
+// =============================================
 
-
-//builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options => {var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+
+// Настройка Swagger с XML-комментариями
+builder.Services.AddSwaggerGen(options => 
+{
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     
-    // Если файл существует — подключаем его
     if (File.Exists(xmlPath))
     {
         options.IncludeXmlComments(xmlPath);
-    }});
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString)); 
-// Потому что данные в памяти 
-builder.Services.AddScoped<IEventService, EventService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
-builder.Services.AddHostedService<BookingBackgroundService>();
-builder.Services.AddScoped<IEventRepository, EventRepository>();
-builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+    }
+});
+
+
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+
 var app = builder.Build();
+
+// =============================================
+// 2. Применение миграций
+// =============================================
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-} 
+}
+
+// =============================================
+// 3. Настройка HTTP pipeline
+// =============================================
+
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -47,4 +56,5 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();

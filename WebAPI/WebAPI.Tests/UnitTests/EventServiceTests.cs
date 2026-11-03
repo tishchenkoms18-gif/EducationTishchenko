@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using WebAPI.DataAccess.Repositories;
+using WebAPI.Infrastructure.DataAccess.Repositories;
 using Xunit;
 
 namespace WebAPI.Tests.UnitTests.Services;
