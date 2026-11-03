@@ -1,7 +1,44 @@
 # EducationTishchenko
 # Event Management API
 
+## 🏗️ Архитектура проекта (Clean Architecture)
+
+Проект разделён на 4 независимые сборки (проекта), чтобы строго соблюдать направление зависимостей. Компилятор не позволит нарушить эти правила.
+
+### Слои и их назначение:
+
+1. ** `WebAPI.Domain`** — Ядро системы.
+   - Содержит: доменные сущности (`Event`, `Booking`), перечисления (`BookingStatus`), доменные исключения (`EventNotFoundException`, `NoAvailableSeatsException`).
+   - **Зависимости:** Нет. Слой полностью изолирован и не знает о существовании базы данных или веб-фреймворков.
+
+2. ** `WebAPI.Application`** — Бизнес-логика (Use Cases).
+   - Содержит: сервисы (`EventService`, `BookingService`), DTO, интерфейсы портов (репозитории `IEventRepository`, `IBookingRepository`).
+   - **Зависимости:** Только от `WebAPI.Domain`.
+
+3. ** `WebAPI.Infrastructure`** — Работа с внешним миром.
+   - Содержит: `AppDbContext`, реализации репозиториев, миграции EF Core, фоновые сервисы (`BookingBackgroundService`).
+   - **Зависимости:** От `WebAPI.Application` и `WebAPI.Domain`.
+
+4. ** `WebAPI`** (Presentation) — Точка входа (веб-слой).
+   - Содержит: контроллеры, Middleware (`GlobalExceptionHandlingMiddleware`), `Program.cs` (Composition Root — регистрация всех зависимостей).
+   - **Зависимости:** От `WebAPI.Application` и `WebAPI.Infrastructure`.
+
+> 💡 **Главное правило:** Слой `Application` **не имеет** ссылки на `Infrastructure`. Бизнес-логика общается с базой данных только через интерфейсы.
+
+### 🗄️ Работа с миграциями 
+Применение миграций происходит автоматически при запуске приложения
+
+Так как `AppDbContext` теперь находится в `Infrastructure`, а `Program.cs` — в `WebAPI`, для создания миграций нужно указывать оба проекта:
+
+```bash
+# Создание новой миграции
+dotnet ef migrations add <НазваниеМиграции> --project WebAPI.Infrastructure/WebAPI.Infrastructure.csproj --startup-project WebAPI/WebAPI.csproj
+```
+
+
+
 REST API для управления мероприятиями с системой бронирования. Проект реализован на ASP.NET Core Web API с хранением данных в памяти.
+
 
 ## Технологии
 
@@ -126,36 +163,7 @@ dotnet test WebAPI.IntegrationTests/WebAPI.IntegrationTests.csproj
 bash
 dotnet test
 
-## 🗄️ Управление схемой базы данных (Миграции)
 
-Схема базы данных управляется через **EF Core Migrations**. При старте приложения автоматически применяются все непримененные миграции (используется `db.Database.Migrate()` в `Program.cs`).
-
-### Создание новой миграции
-Если вы изменили модели (`Event`, `Booking`), создайте новую миграцию:
-```bash
-dotnet ef migrations add <НазваниеМиграции> --project WebAPI
-```
-### Применение миграций
- dotnet ef database update --project WebAPI
-
-###  Откат миграций
-dotnet ef database update <ИмяМиграции> --project WebAPI
-
-## 📁 Структура проекта
-📁 WebAPI/
-├── 📁 Controllers/
-├── 📁 Models/
-├── 📁 Services/
-├── 📁 DataAccess/
-│   ├── AppDbContext.cs
-│   ├── 📁 Configurations/       # Fluent API (EventConfiguration, BookingConfiguration)
-│   └── 📁 Repositories/         # IEventRepository, IBookingRepository и их реализации
-├── 📁 Migrations/               # EF Core миграции
-├── Program.cs
-└── WebAPI.csproj
-
-📁 WebAPI.Tests/                 # Юнит-тесты (InMemory)
-📁 WebAPI.IntegrationTests/      # Интеграционные тесты (Testcontainers + PostgreSQL)
 
 ##📝 Примеры запросов
 ###1. Создание события (POST)
