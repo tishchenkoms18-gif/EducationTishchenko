@@ -1,5 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using WebAPI.DataAccess.Repositories;
+using Microsoft.Extensions.Logging;
 
 public class BookingService : IBookingService
 {

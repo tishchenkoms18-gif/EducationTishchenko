@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using WebAPI.DataAccess.Repositories;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 
 public class BookingBackgroundService : BackgroundService
@@ -13,7 +14,7 @@ public class BookingBackgroundService : BackgroundService
     public BookingBackgroundService(
         IServiceScopeFactory scopeFactory,
         ILogger<BookingBackgroundService> logger)
-    {
+    { 
         _scopeFactory = scopeFactory;
         _logger = logger;
     }

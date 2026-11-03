@@ -1,5 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-
+using Microsoft.Extensions.Logging;
 public class EventService : IEventService
 {
     private readonly IEventRepository _eventRepository;

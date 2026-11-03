@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.14" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
@@ -20,6 +21,12 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="..\WebAPI\WebAPI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WebAPI.Application\WebAPI.Application.csproj" />
+    <ProjectReference Include="..\WebAPI.Domain\WebAPI.Domain.csproj" />
+    <ProjectReference Include="..\WebAPI.Infrastructure\WebAPI.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
