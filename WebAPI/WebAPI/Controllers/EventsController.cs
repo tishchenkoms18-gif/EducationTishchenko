@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-namespace WebAPI.Controllers;
+
+
 
 [ApiController]
 [Route("api/[controller]")]
@@ -7,26 +8,21 @@ public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
     private readonly IBookingService _bookingService;
-    private readonly ILogger<EventsController> _logger;
 
     public EventsController(
         IEventService eventService,
-        IBookingService bookingService,
-        ILogger<EventsController> logger)
+        IBookingService bookingService)
     {
         _eventService = eventService;
         _bookingService = bookingService;
-        _logger = logger;
     }
 
     /// <summary>
     /// Получить список всех событий с фильтрацией и пагинацией
-    /// </summary>
     /// <param name="title">Поиск по названию (частичное совпадение, регистронезависимый)</param>
     /// <param name="from">События, начинающиеся не раньше указанной даты</param>
     /// <param name="to">События, заканчивающиеся не позже указанной даты</param>
-    /// <param name="page">Страница, которую необходимо вернуть (по умолчанию 1)</param>
-    /// <param name="pageSize">Количество элементов на странице (по умолчанию 10, макс. 100)</param>
+    /// </summary>
     // GET: api/events
     [HttpGet]
     public async Task<IActionResult> GetAll(
@@ -53,7 +49,6 @@ public class EventsController : ControllerBase
     /// <summary>
     /// Получение события по ID
     /// </summary>
-    /// <param name="id">Идентификатор события</param>
     // GET: api/events/{id}
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById([FromRoute] Guid id)
@@ -65,16 +60,13 @@ public class EventsController : ControllerBase
     /// <summary>
     /// Создать бронирование на событие (быстрый ответ 202 Accepted)
     /// </summary>
-    /// <param name="id">Идентификатор события</param>
-    /// <returns>202 Accepted + Location</returns>
+    // POST: api/events/{id}/book
     [HttpPost("{id}/book")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> BookEventAsync(Guid id)
     {
-        // Создаём бронь (исключения уходят в middleware)
         var booking = await _bookingService.CreateBookingAsync(id);
 
         var response = new BookingResponse
@@ -96,7 +88,6 @@ public class EventsController : ControllerBase
     /// <summary>
     /// Создание события
     /// </summary>
-    /// <param name="request">Данные для создания события</param>
     // POST: api/events
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
@@ -117,22 +108,19 @@ public class EventsController : ControllerBase
     /// <summary>
     /// Создание нескольких событий за один запрос
     /// </summary>
-    /// <param name="request">Список событий для создания</param>
-    /// <returns>Список созданных событий</returns>
-    /// <response code="201">Все события успешно созданы</response>
-    /// <response code="400">Ошибка валидации или превышено максимальное количество</response>
+    // POST: api/events/batch
     [HttpPost("batch")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateBatch([FromBody] CreateEventsRequest request)
     {
+
         if (request.Events == null || !request.Events.Any())
-            return BadRequest(new { error = "Список событий не может быть пустым" });
+            throw new ValidationException("Список событий не может быть пустым");
 
         if (request.Events.Count > 100)
-            return BadRequest(new { error = "Нельзя создать более 100 событий за раз" });
+            throw new ValidationException("Нельзя создать более 100 событий за раз");
 
-       
         var createdEvents = await _eventService.CreateEventsAsync(request.Events);
 
         var response = new
@@ -148,8 +136,6 @@ public class EventsController : ControllerBase
     /// <summary>
     /// Обновление события (полное)
     /// </summary>
-    /// <param name="id">Идентификатор события</param>
-    /// <param name="request">Данные для обновления</param>
     // PUT: api/events/{id}
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
@@ -167,7 +153,6 @@ public class EventsController : ControllerBase
     /// <summary>
     /// Удаление события по ID
     /// </summary>
-    /// <param name="id">Идентификатор события</param>
     // DELETE: api/events/{id}
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
@@ -177,7 +162,7 @@ public class EventsController : ControllerBase
     }
 
     // =============================================
-    // Приватные методы
+    // Приватные методы (Маппинг)
     // =============================================
 
     private static EventResponse MapToResponse(Event eventEntity)
