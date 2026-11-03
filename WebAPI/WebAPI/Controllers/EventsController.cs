@@ -117,12 +117,6 @@ public class EventsController : ControllerBase
     public async Task<IActionResult> CreateBatch([FromBody] CreateEventsRequest request)
     {
 
-        if (request.Events == null || !request.Events.Any())
-            throw new ValidationException("Список событий не может быть пустым");
-
-        if (request.Events.Count > 100)
-            throw new ValidationException("Нельзя создать более 100 событий за раз");
-
         var createdEvents = await _eventService.CreateEventsAsync(request.Events);
 
         var response = new
