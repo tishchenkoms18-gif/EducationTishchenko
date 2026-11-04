@@ -1,5 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using WebAPI.DataAccess.Repositories;
+using Microsoft.Extensions.Logging;
 
 public class BookingService : IBookingService
 {
@@ -20,10 +19,37 @@ public class BookingService : IBookingService
         _logger = logger;
     }
 
+    public async Task ProcessBookingAsync(Guid bookingId, CancellationToken cancellationToken = default)
+    {
+        var booking = await _bookingRepository.GetByIdAsync(bookingId, cancellationToken);
+        if (booking == null)
+        {
+            _logger.LogWarning("Бронь {BookingId} не найдена при обработке", bookingId);
+            return;
+        }
+
+        if (booking.Status != BookingStatus.Pending)
+            return;
+
+        var eventEntity = await _eventRepository.GetByIdAsync(booking.EventId, cancellationToken);
+
+        if (eventEntity == null)
+        {
+            // Событие удалено → отклоняем бронь 
+            await RejectBookingInternalAsync(booking, cancellationToken);
+            _logger.LogWarning("Бронь {BookingId} отклонена: событие {EventId} не найдено",
+                booking.Id, booking.EventId);
+            return;
+        }
+
+        // Всё ок → подтверждаем
+        await ConfirmBookingInternalAsync(booking, cancellationToken);
+        _logger.LogInformation("Бронь {BookingId} подтверждена", booking.Id);
+    }
     public async Task<Booking> CreateBookingAsync(Guid eventId)
     {
         if (eventId == Guid.Empty)
-            throw new ArgumentException("EventId не может быть пустым", nameof(eventId));
+            throw new EventValidationException(eventId, "EventId не может быть пустым");
 
         await _bookingSemaphore.WaitAsync();   
         try
@@ -108,7 +134,27 @@ public class BookingService : IBookingService
             "Отклонено бронирование: {BookingId} для события {EventId}",
             booking.Id, booking.EventId);
     }
+    private async Task ConfirmBookingInternalAsync(Booking booking, CancellationToken cancellationToken)
+    {
+        booking.Confirm();
+        await _bookingRepository.UpdateAsync(booking, cancellationToken);
+        await _bookingRepository.SaveChangesAsync(cancellationToken);
+    }
 
+    private async Task RejectBookingInternalAsync(Booking booking, CancellationToken cancellationToken)
+    {
+        booking.Reject();
+
+        var eventEntity = await _eventRepository.GetByIdAsync(booking.EventId, cancellationToken);
+        if (eventEntity != null)
+        {
+            eventEntity.ReleaseSeats(1);
+            await _eventRepository.UpdateAsync(eventEntity, cancellationToken);
+        }
+
+        await _bookingRepository.UpdateAsync(booking, cancellationToken);
+        await _bookingRepository.SaveChangesAsync(cancellationToken);
+    }
     public async Task<List<Booking>> GetAllBookingsAsync()
     {
         return await _bookingRepository.GetAllAsync();

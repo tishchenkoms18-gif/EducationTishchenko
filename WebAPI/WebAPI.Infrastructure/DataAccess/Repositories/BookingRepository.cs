@@ -1,8 +1,8 @@
 using System;
 using Microsoft.EntityFrameworkCore;
-using WebAPI.DataAccess.Repositories;
 
-namespace WebAPI.DataAccess.Repositories;
+
+namespace WebAPI.Infrastructure.DataAccess.Repositories;
 
 public class BookingRepository : IBookingRepository
 {

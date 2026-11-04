@@ -1,18 +1,54 @@
 # EducationTishchenko
 # Event Management API
 
-REST API для управления мероприятиями с системой бронирования. Проект реализован на ASP.NET Core Web API с хранением данных в памяти.
+## Архитектура проекта (Clean Architecture)
+
+Проект разделён на 4 независимые сборки (проекта), чтобы строго соблюдать направление зависимостей. Компилятор не позволит нарушить эти правила.
+
+### Слои и их назначение:
+
+1. ** `WebAPI.Domain`** — Ядро системы.
+   - Содержит: доменные сущности (`Event`, `Booking`), перечисления (`BookingStatus`), доменные исключения (`EventNotFoundException`, `NoAvailableSeatsException`).
+   - **Зависимости:** Нет. Слой полностью изолирован и не знает о существовании базы данных или веб-фреймворков.
+
+2. ** `WebAPI.Application`** — Бизнес-логика (Use Cases).
+   - Содержит: сервисы (`EventService`, `BookingService`), DTO, интерфейсы портов (репозитории `IEventRepository`, `IBookingRepository`).
+   - **Зависимости:** Только от `WebAPI.Domain`.
+
+3. ** `WebAPI.Infrastructure`** — Работа с внешним миром.
+   - Содержит: `AppDbContext`, реализации репозиториев, миграции EF Core, фоновые сервисы (`BookingBackgroundService`).
+   - **Зависимости:** От `WebAPI.Application` и `WebAPI.Domain`.
+
+4. ** `WebAPI`** (Presentation) — Точка входа (веб-слой).
+   - Содержит: контроллеры, Middleware (`GlobalExceptionHandlingMiddleware`), `Program.cs` (Composition Root — регистрация всех зависимостей).
+   - **Зависимости:** От `WebAPI.Application` и `WebAPI.Infrastructure`.
+
+> 💡 **Главное правило:** Слой `Application` **не имеет** ссылки на `Infrastructure`. Бизнес-логика общается с базой данных только через интерфейсы.
+
+### Работа с миграциями 
+Применение миграций происходит автоматически при запуске приложения
+
+Так как `AppDbContext` теперь находится в `Infrastructure`, а `Program.cs` — в `WebAPI`, для создания миграций нужно указывать оба проекта:
+
+```bash
+# Создание новой миграции
+dotnet ef migrations add <НазваниеМиграции> --project WebAPI.Infrastructure/WebAPI.Infrastructure.csproj --startup-project WebAPI/WebAPI.csproj
+```
+
+
+
+REST API для управления мероприятиями с системой бронирования. Проект реализован на ASP.NET Core Web API с использованием PostgreSQL и EF Core.
+
 
 ## Технологии
 
 - .NET 10
 - ASP.NET Core Web API
 - Swagger / Swashbuckle
-- In-Memory хранилище (`List<Event>`, `List<Booking>`)
 - xUnit + Moq (юнит-тесты)
 - EF Core Migrations
 - Testcontainers
-- Потокобезопасность: `lock`, `SemaphoreSlim`
+- Потокобезопасность: `SemaphoreSlim`
 
 ---
 
@@ -31,7 +67,7 @@ REST API для управления мероприятиями с систем�
 
 ---
 
-## 🧾 Модель Event
+## Модель Event
 
 | Поле | Тип | Описание |
 |------|-----|----------|
@@ -53,7 +89,7 @@ REST API для управления мероприятиями с систем�
 
 ---
 
-## 🧾 Модель Booking
+## Модель Booking
 
 | Поле | Тип | Описание |
 |------|-----|----------|
@@ -73,7 +109,7 @@ REST API для управления мероприятиями с систем�
 
 ---
 
-## 🔒 Синхронизация и потокобезопасность
+## Синхронизация и потокобезопасность
 
 Для защиты от **овербукинга** при конкурентных запросах используются следующие примитивы:
 
@@ -84,7 +120,7 @@ REST API для управления мероприятиями с систем�
 
 ---
 
-## ⚠️ Овербукинг и 409 Conflict
+## Овербукинг и 409 Conflict
 
 Эндпоинт `POST /api/events/{id}/book` может вернуть:
 
@@ -106,16 +142,16 @@ REST API для управления мероприятиями с систем�
        "totalSeats": 3
    }
    ```
-##🧪 Запуск тестов
+##  Запуск тестов
 Проект содержит юнит-тесты и интеграционные тесты.
 
-###Юнит-тесты
+### Юнит-тесты
 Используют EF Core InMemory-провайдер. Docker не требуется.
 
 bash
 dotnet test WebAPI.Tests/WebAPI.Tests.csproj
 
-###Интеграционные тесты
+### Интеграционные тесты
 Используют Testcontainers для запуска реального контейнера PostgreSQL.
 Важно: Для запуска интеграционных тестов обязательно должен быть запущен Docker (Docker Desktop).
 bash
@@ -126,39 +162,10 @@ dotnet test WebAPI.IntegrationTests/WebAPI.IntegrationTests.csproj
 bash
 dotnet test
 
-## 🗄️ Управление схемой базы данных (Миграции)
 
-Схема базы данных управляется через **EF Core Migrations**. При старте приложения автоматически применяются все непримененные миграции (используется `db.Database.Migrate()` в `Program.cs`).
 
-### Создание новой миграции
-Если вы изменили модели (`Event`, `Booking`), создайте новую миграцию:
-```bash
-dotnet ef migrations add <НазваниеМиграции> --project WebAPI
-```
-### Применение миграций
- dotnet ef database update --project WebAPI
-
-###  Откат миграций
-dotnet ef database update <ИмяМиграции> --project WebAPI
-
-## 📁 Структура проекта
-📁 WebAPI/
-├── 📁 Controllers/
-├── 📁 Models/
-├── 📁 Services/
-├── 📁 DataAccess/
-│   ├── AppDbContext.cs
-│   ├── 📁 Configurations/       # Fluent API (EventConfiguration, BookingConfiguration)
-│   └── 📁 Repositories/         # IEventRepository, IBookingRepository и их реализации
-├── 📁 Migrations/               # EF Core миграции
-├── Program.cs
-└── WebAPI.csproj
-
-📁 WebAPI.Tests/                 # Юнит-тесты (InMemory)
-📁 WebAPI.IntegrationTests/      # Интеграционные тесты (Testcontainers + PostgreSQL)
-
-##📝 Примеры запросов
-###1. Создание события (POST)
+##  Примеры запросов
+### 1. Создание события (POST)
 Запрос:
 
 http

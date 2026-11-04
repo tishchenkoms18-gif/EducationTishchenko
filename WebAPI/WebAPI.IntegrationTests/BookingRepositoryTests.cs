@@ -1,7 +1,7 @@
 // WebAPI.IntegrationTests/BookingRepositoryTests.cs
-using WebAPI.DataAccess.Repositories;
 using WebAPI.IntegrationTests.Fixtures;
 using Xunit;
+using WebAPI.Infrastructure.DataAccess.Repositories;
 
 namespace WebAPI.IntegrationTests;
 

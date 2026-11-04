@@ -1,5 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-
+using Microsoft.Extensions.Logging;
 public class EventService : IEventService
 {
     private readonly IEventRepository _eventRepository;
@@ -19,6 +18,7 @@ public class EventService : IEventService
         int totalSeats,
         CancellationToken cancellationToken = default)
     {
+        
         var eventEntity = Event.Create(title, description, startAt, endAt, totalSeats);
 
         await _eventRepository.AddAsync(eventEntity, cancellationToken);
@@ -35,8 +35,13 @@ public class EventService : IEventService
         List<CreateEventRequest> eventRequests,
         CancellationToken cancellationToken = default)
     {
+        
         if (eventRequests == null || !eventRequests.Any())
-            throw new ArgumentException("Список событий не может быть пустым");
+            throw new ValidationException("Список событий не может быть пустым");
+            
+        if (eventRequests.Count > 100)
+            throw new ValidationException("Нельзя создать более 100 событий за раз");
+
 
         var createdEvents = new List<Event>();
 

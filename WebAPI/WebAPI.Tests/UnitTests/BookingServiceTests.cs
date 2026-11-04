@@ -3,8 +3,9 @@ using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using WebAPI.DataAccess.Repositories;
+using WebAPI.Infrastructure.DataAccess.Repositories;
 using Xunit;
+using Moq;
 
 namespace WebAPI.Tests.UnitTests.Services;
 
@@ -199,12 +200,12 @@ public class BookingServiceTests : IDisposable
     // =============================================
 
     [Fact]
-    public async Task CreateBookingAsync_ShouldThrowArgumentException_WhenEventIdIsEmpty()
+    public async Task CreateBookingAsync_ShouldThrowEventValidationException_WhenEventIdIsEmpty()
     {
         using var scope = _serviceProvider.CreateScope();
         var bookingService = GetBookingService(scope);
 
-        await Assert.ThrowsAsync<ArgumentException>(() =>
+        await Assert.ThrowsAsync<EventValidationException>(() =>
             bookingService.CreateBookingAsync(Guid.Empty));
     }
 
@@ -327,5 +328,76 @@ public class BookingServiceTests : IDisposable
 
         Assert.Equal(10, ids.Count);
         Assert.Equal(10, ids.Distinct().Count());
+    }
+
+    // WebAPI.Tests/UnitTests/Services/BookingServiceTests.cs
+
+[Fact]
+    public async Task ProcessBookingAsync_ShouldConfirmBooking_WhenEventExists()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var eventService = GetEventService(scope);
+        var bookingService = GetBookingService(scope);
+
+        var existingEvent = await CreateTestEventAsync(eventService, totalSeats: 10);
+        var booking = await bookingService.CreateBookingAsync(existingEvent.Id);
+
+        // Act
+        await bookingService.ProcessBookingAsync(booking.Id);
+
+        // Assert
+        var updated = await bookingService.GetBookingByIdAsync(booking.Id);
+        Assert.Equal(BookingStatus.Confirmed, updated.Status);
+        Assert.NotNull(updated.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task ProcessBookingAsync_ShouldRejectBooking_WhenEventDoesNotExist()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var eventService = GetEventService(scope);
+        var bookingService = GetBookingService(scope);
+
+        var existingEvent = await CreateTestEventAsync(eventService, totalSeats: 1);
+        var booking = await bookingService.CreateBookingAsync(existingEvent.Id);
+        Assert.Equal(0, existingEvent.AvailableSeats);
+
+        var eventRepo = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+        await eventRepo.DeleteAsync(existingEvent.Id, default);
+        await eventRepo.SaveChangesAsync(default);
+
+        // Act
+        await bookingService.ProcessBookingAsync(booking.Id);
+
+        // Assert
+        await Assert.ThrowsAsync<BookingNotFoundException>(async () =>
+            await bookingService.GetBookingByIdAsync(booking.Id));
+    }
+    [Fact]
+    public async Task ProcessBookingAsync_ShouldRejectBooking_WhenEventIsNull()
+    {
+        // Arrange
+        var bookingId = Guid.NewGuid();
+        var eventId = Guid.NewGuid();
+        var pendingBooking = Booking.Create(eventId); // Status = Pending
+
+        var eventRepoMock = new Mock<IEventRepository>();
+        eventRepoMock.Setup(x => x.GetByIdAsync(eventId, It.IsAny<CancellationToken>()))
+                    .ReturnsAsync((Event?)null);
+
+        var bookingRepoMock = new Mock<IBookingRepository>();
+        bookingRepoMock.Setup(x => x.GetByIdAsync(bookingId, It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(pendingBooking);
+
+        var loggerMock = new Mock<ILogger<BookingService>>();
+        var service = new BookingService(bookingRepoMock.Object, eventRepoMock.Object, loggerMock.Object);
+
+        // Act
+        await service.ProcessBookingAsync(bookingId);
+
+        // Assert
+        Assert.Equal(BookingStatus.Rejected, pendingBooking.Status);
+        bookingRepoMock.Verify(x => x.UpdateAsync(pendingBooking, It.IsAny<CancellationToken>()), Times.Once);
+        bookingRepoMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 }

@@ -54,7 +54,6 @@ public class GlobalExceptionHandlingMiddleware
         => ex switch
         {
             //  Ошибки клиента
-            ArgumentException => StatusCodes.Status400BadRequest,
             ValidationException => StatusCodes.Status400BadRequest,
             InvalidOperationException => StatusCodes.Status400BadRequest,
             EventValidationException => StatusCodes.Status400BadRequest,
