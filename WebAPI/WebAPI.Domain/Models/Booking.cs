@@ -36,7 +36,7 @@ public class Booking {
     public static Booking Create(Guid eventId)
     {
         if (eventId == Guid.Empty)
-            throw new ArgumentException("EventId не может быть пустым", nameof(eventId));
+            throw new EventValidationException(eventId, "EventId не может быть пустым");
        
 
         return new Booking
