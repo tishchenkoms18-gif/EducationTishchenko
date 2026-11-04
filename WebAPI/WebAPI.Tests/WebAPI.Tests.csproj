@@ -19,11 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Xunit" />
-    <ProjectReference Include="..\WebAPI\WebAPI.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\WebAPI.Application\WebAPI.Application.csproj" />
     <ProjectReference Include="..\WebAPI.Domain\WebAPI.Domain.csproj" />
     <ProjectReference Include="..\WebAPI.Infrastructure\WebAPI.Infrastructure.csproj" />
