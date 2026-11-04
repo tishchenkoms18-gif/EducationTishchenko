@@ -2,7 +2,7 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore;    
 using WebAPI.Infrastructure.DependencyInjection;   
 using WebAPI.Infrastructure.DataAccess;  
-using WebAPI.DependencyInjection;                                
+using WebAPI.Application.DependencyInjection;                             
 
 var builder = WebApplication.CreateBuilder(args);
 
