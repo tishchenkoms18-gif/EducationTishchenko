@@ -2,7 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 
 
-namespace WebAPI.DependencyInjection;
+namespace WebAPI.Application.DependencyInjection;
 
 public static class ApplicationExtensions
 {
