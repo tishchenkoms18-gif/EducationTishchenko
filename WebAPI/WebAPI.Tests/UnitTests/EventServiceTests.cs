@@ -316,12 +316,12 @@ public class EventServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateEvent_ShouldThrowArgumentException_WhenTitleIsEmpty()
+    public async Task CreateEvent_ShouldThrowAEventValidationException_WhenTitleIsEmpty()
     {
         using var scope = _serviceProvider.CreateScope();
         var eventService = GetEventService(scope);
 
-        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+        var exception = await Assert.ThrowsAsync<EventValidationException>(() =>
             eventService.CreateEventAsync(
                 "", null,
                 DateTime.UtcNow.AddDays(1),
@@ -332,12 +332,12 @@ public class EventServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateEvent_ShouldThrowArgumentException_WhenStartAtIsAfterEndAt()
+    public async Task CreateEvent_ShouldThrowEventValidationException_WhenStartAtIsAfterEndAt()
     {
         using var scope = _serviceProvider.CreateScope();
         var eventService = GetEventService(scope);
 
-        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+        var exception = await Assert.ThrowsAsync<EventValidationException>(() =>
             eventService.CreateEventAsync(
                 "Test Event", null,
                 DateTime.UtcNow.AddDays(5),

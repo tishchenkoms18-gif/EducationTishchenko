@@ -75,21 +75,21 @@ public class Event
     private static void Validate(string title, DateTime startAt, DateTime endAt)
     {
         if (string.IsNullOrWhiteSpace(title))
-            throw new ArgumentException("Название события обязательно");
+            throw new EventValidationException("Название события обязательно");
 
         if (title.Length > 300)
-            throw new ArgumentException("Название не должно превышать 300 символов");
+            throw new EventValidationException("Название не должно превышать 300 символов");
 
         if (startAt >= endAt)
-            throw new ArgumentException("Дата начала должна быть раньше даты окончания");
+            throw new EventValidationException("Дата начала должна быть раньше даты окончания");
 
         if (startAt < DateTime.UtcNow.AddHours(-1))
-            throw new ArgumentException("Нельзя создавать событие в прошлом");
+            throw new EventValidationException("Нельзя создавать событие в прошлом");
     }
 
     public bool TryReserveSeats(int count = 1)
     {
-        if (count <= 0) throw new ArgumentException("Количество должно быть позитивным числом");
+        if (count <= 0) throw new EventValidationException("Количество должно быть позитивным числом");
         if (AvailableSeats < count) return false;
         
         AvailableSeats -= count;
@@ -98,7 +98,7 @@ public class Event
 
     public void ReleaseSeats(int count = 1)
     {
-        if (count <= 0) throw new ArgumentException("Количество должно быть позитивным числом");
+        if (count <= 0) throw new EventValidationException("Количество должно быть позитивным числом");
         AvailableSeats = Math.Min(AvailableSeats + count, TotalSeats);
     }
 }

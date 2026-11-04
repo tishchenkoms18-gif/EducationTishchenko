@@ -1,8 +1,12 @@
 public class EventValidationException : Exception
 {
     public IEnumerable<string> Errors { get; } = Enumerable.Empty<string>();
-    public Guid EventId { get; }
-
+    public Guid? EventId { get; }
+    public EventValidationException(string message)
+            : base(message)
+        {
+            EventId = null;
+        }
     public EventValidationException(Guid eventId)
         : base($"Событие с ID '{eventId}' не прошло валидацию.")
     {
